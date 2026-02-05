@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { Area, AreaChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { supabase } from "@/lib/supabaseClient"
 import {
     Card,
@@ -13,60 +13,123 @@ import {
 import {
     ChartConfig,
     ChartContainer,
+    ChartLegend,
+    ChartLegendContent,
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 // Configuração do gráfico
 const chartConfig = {
-    leads: {
-        label: "Leads",
+    renataOriginal: {
+        label: "Renata Original",
         color: "hsl(var(--chart-1))",
+    },
+    renataCardoso: {
+        label: "Renata Cardoso",
+        color: "hsl(var(--chart-2))",
+    },
+    outros: {
+        label: "Outros",
+        color: "hsl(var(--chart-3))",
     },
 } satisfies ChartConfig
 
 interface ChartDataPoint {
     date: string
-    leads: number
+    renataOriginal: number
+    renataCardoso: number
+    outros: number
     fullDate: Date
 }
 
 export function LeadsAreaChart() {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([])
     const [loading, setLoading] = useState(true)
-    const [todayCount, setTodayCount] = useState(0)
+    const [timeRange, setTimeRange] = useState("90d")
 
     // Função para buscar dados históricos
     const fetchLeadsData = async () => {
         try {
-            // Buscar leads dos últimos 90 dias
-            const ninetyDaysAgo = new Date()
-            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+            setLoading(true)
+            let queryStart = new Date()
+            let isAllTime = false
 
-            const { data, error } = await supabase
+            switch (timeRange) {
+                case "7d":
+                    queryStart.setDate(queryStart.getDate() - 7)
+                    break
+                case "15d":
+                    queryStart.setDate(queryStart.getDate() - 15)
+                    break
+                case "30d":
+                    queryStart.setDate(queryStart.getDate() - 30)
+                    break
+                case "60d":
+                    queryStart.setDate(queryStart.getDate() - 60)
+                    break
+                case "90d":
+                    queryStart.setDate(queryStart.getDate() - 90)
+                    break
+                case "all":
+                    isAllTime = true
+                    break
+                default:
+                    queryStart.setDate(queryStart.getDate() - 90)
+            }
+
+            let query = supabase
                 .from('leads')
-                .select('created_at')
-                .gte('created_at', ninetyDaysAgo.toISOString())
+                .select('created_at, id_agent')
                 .is('deleted_at', null)
                 .order('created_at', { ascending: true })
 
+            if (!isAllTime) {
+                query = query.gte('created_at', queryStart.toISOString())
+            }
+
+            const { data, error } = await query
+
             if (error) {
                 console.error('Erro ao buscar leads:', error)
+                setLoading(false)
                 return
             }
 
-            // Processar dados para contar leads por dia
-            // Usar Map para garantir ordem e unicidade
-            const leadsByDate = new Map<string, number>()
+            // Helper to parse date string
+            const parseDate = (dateStr: string) => {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('pt-BR');
+            };
+
+            // Processar dados agrupando por data e agente
+            const leadsByDate = new Map<string, { renataOriginal: number, renataCardoso: number, outros: number }>()
 
             data?.forEach(lead => {
-                const dateObj = new Date(lead.created_at)
-                const dateStr = dateObj.toLocaleDateString('pt-BR') // dd/mm/yyyy
-                leadsByDate.set(dateStr, (leadsByDate.get(dateStr) || 0) + 1)
+                const dateStr = parseDate(lead.created_at);
+                const currentCounts = leadsByDate.get(dateStr) || { renataOriginal: 0, renataCardoso: 0, outros: 0 };
+
+                const agentId = lead.id_agent;
+
+                if (agentId === '+554797081463') {
+                    currentCounts.renataOriginal++;
+                } else if (agentId === '+554796621550') {
+                    currentCounts.renataCardoso++;
+                } else {
+                    currentCounts.outros++;
+                }
+
+                leadsByDate.set(dateStr, currentCounts);
             })
 
-            // Converter para array e ordenar cronologicamente
-            // Precisamos converter 'dd/mm/yyyy' de volta para Date para ordenar corretamente
+            // Converter e ordenar
             const sortedEntries = Array.from(leadsByDate.entries()).sort((a, b) => {
                 const [dayA, monthA, yearA] = a[0].split('/').map(Number)
                 const [dayB, monthB, yearB] = b[0].split('/').map(Number)
@@ -74,23 +137,17 @@ export function LeadsAreaChart() {
             })
 
             const formattedData: ChartDataPoint[] = sortedEntries.map(
-                ([date, count]) => {
+                ([date, counts]) => {
                     const [day, month, year] = date.split('/').map(Number)
                     return {
                         date,
-                        leads: count,
+                        ...counts,
                         fullDate: new Date(year, month - 1, day)
                     }
                 }
             )
 
             setChartData(formattedData)
-
-            // Calcular leads de hoje
-            const todayStr = new Date().toLocaleDateString('pt-BR')
-            const todayData = formattedData.find(d => d.date === todayStr)
-            setTodayCount(todayData ? todayData.leads : 0)
-
             setLoading(false)
         } catch (err) {
             console.error('Erro:', err)
@@ -98,11 +155,12 @@ export function LeadsAreaChart() {
         }
     }
 
-    // Subscrever a mudanças em tempo real
     useEffect(() => {
         fetchLeadsData()
+    }, [timeRange])
 
-        // Configurar realtime subscription
+    // Subscrever a mudanças em tempo real
+    useEffect(() => {
         const channel = supabase
             .channel('leads-changes')
             .on(
@@ -112,49 +170,106 @@ export function LeadsAreaChart() {
                     schema: 'public',
                     table: 'leads',
                 },
-                (payload) => {
-                    console.log('Mudança detectada:', payload)
-                    // Recarregar dados quando houver mudanças
+                () => {
                     fetchLeadsData()
                 }
             )
             .subscribe()
 
-        // Cleanup
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [])
-
-    if (loading) {
-        return <div className="p-4">Carregando dados...</div>
-    }
+    }, [timeRange])
 
     return (
-        <Card className="w-full">
-            <CardHeader>
-                <CardTitle>Leads Hoje: {todayCount}</CardTitle>
-                <CardDescription>
-                    Total de leads recebidos nos últimos 90 dias
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
-                    <AreaChart
-                        data={chartData}
-                        margin={{
-                            left: 12,
-                            right: 12,
-                            top: 12,
-                            bottom: 12
-                        }}
+        <Card>
+            <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+                <div className="grid flex-1 gap-1 text-center sm:text-left">
+                    <CardTitle>Desempenho por Agente</CardTitle>
+                    <CardDescription>
+                        Comparativo de leads: Renata Original vs Renata Cardoso
+                    </CardDescription>
+                </div>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                    <SelectTrigger
+                        className="w-[160px] rounded-lg sm:ml-auto"
+                        aria-label="Selecione o período"
                     >
-                        <CartesianGrid vertical={false} />
+                        <SelectValue placeholder="Últimos 3 meses" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                        <SelectItem value="7d" className="rounded-lg">
+                            Últimos 7 dias
+                        </SelectItem>
+                        <SelectItem value="15d" className="rounded-lg">
+                            Últimos 15 dias
+                        </SelectItem>
+                        <SelectItem value="30d" className="rounded-lg">
+                            Últimos 30 dias
+                        </SelectItem>
+                        <SelectItem value="60d" className="rounded-lg">
+                            Últimos 60 dias
+                        </SelectItem>
+                        <SelectItem value="90d" className="rounded-lg">
+                            Últimos 90 dias
+                        </SelectItem>
+                        <SelectItem value="all" className="rounded-lg">
+                            Todo o período
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </CardHeader>
+            <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+                <ChartContainer
+                    config={chartConfig}
+                    className="aspect-auto h-[250px] w-full"
+                >
+                    <AreaChart data={chartData}>
+                        <defs>
+                            <linearGradient id="fillRenataOriginal" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                    offset="5%"
+                                    stopColor="var(--color-renataOriginal)"
+                                    stopOpacity={0.8}
+                                />
+                                <stop
+                                    offset="95%"
+                                    stopColor="var(--color-renataOriginal)"
+                                    stopOpacity={0.1}
+                                />
+                            </linearGradient>
+                            <linearGradient id="fillRenataCardoso" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                    offset="5%"
+                                    stopColor="var(--color-renataCardoso)"
+                                    stopOpacity={0.8}
+                                />
+                                <stop
+                                    offset="95%"
+                                    stopColor="var(--color-renataCardoso)"
+                                    stopOpacity={0.1}
+                                />
+                            </linearGradient>
+                            <linearGradient id="fillOutros" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                    offset="5%"
+                                    stopColor="var(--color-outros)"
+                                    stopOpacity={0.8}
+                                />
+                                <stop
+                                    offset="95%"
+                                    stopColor="var(--color-outros)"
+                                    stopOpacity={0.1}
+                                />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.1)" />
                         <XAxis
                             dataKey="date"
                             tickLine={false}
                             axisLine={false}
                             tickMargin={8}
+                            minTickGap={32}
                             tickFormatter={(value) => {
                                 const [day, month] = value.split('/')
                                 return `${day}/${month}`
@@ -162,22 +277,36 @@ export function LeadsAreaChart() {
                         />
                         <ChartTooltip
                             cursor={false}
-                            content={<ChartTooltipContent indicator="dot" hideLabel />}
+                            content={<ChartTooltipContent indicator="dot" />}
                         />
-                        <defs>
-                            <linearGradient id="fillLeads" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--color-leads)" stopOpacity={0.8} />
-                                <stop offset="95%" stopColor="var(--color-leads)" stopOpacity={0.1} />
-                            </linearGradient>
-                        </defs>
                         <Area
-                            dataKey="leads"
-                            type="monotone"
-                            fill="url(#fillLeads)"
+                            dataKey="outros"
+                            type="natural"
+                            fill="url(#fillOutros)"
+                            stroke="var(--color-outros)"
                             fillOpacity={0.4}
-                            stroke="var(--color-leads)"
                             strokeWidth={2}
+                            stackId="a"
                         />
+                        <Area
+                            dataKey="renataCardoso"
+                            type="natural"
+                            fill="url(#fillRenataCardoso)"
+                            stroke="var(--color-renataCardoso)"
+                            fillOpacity={0.4}
+                            strokeWidth={2}
+                            stackId="a"
+                        />
+                        <Area
+                            dataKey="renataOriginal"
+                            type="natural"
+                            fill="url(#fillRenataOriginal)"
+                            stroke="var(--color-renataOriginal)"
+                            fillOpacity={0.4}
+                            strokeWidth={2}
+                            stackId="a"
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
                     </AreaChart>
                 </ChartContainer>
             </CardContent>
