@@ -37,11 +37,11 @@
 
         /* Chart Colors - Matching the blue-gray tones from reference */
         --chart-1: 215 25% 50%;
-        /* Steel blue - lighter */
-        --chart-2: 215 20% 40%;
-        /* Steel blue - medium */
-        --chart-3: 215 15% 30%;
         /* Steel blue - darker */
+        --chart-2: 215 25% 65%;
+        /* Steel blue - lighter (Renata Cardoso) */
+        --chart-3: 215 15% 30%;
+        /* Steel blue - darkest */
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
     }
@@ -69,7 +69,7 @@
 
         /* Chart Colors */
         --chart-1: 215 25% 50%;
-        --chart-2: 215 20% 40%;
+        --chart-2: 215 25% 65%;
         --chart-3: 215 15% 30%;
         --chart-4: 280 65% 60%;
         --chart-5: 340 75% 55%;
