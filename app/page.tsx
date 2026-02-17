@@ -8,12 +8,18 @@ import { HelpView } from "@/components/help-view"
 
 export default function Home() {
     const [currentView, setCurrentView] = useState("dashboard")
+    const [isCollapsed, setIsCollapsed] = useState(false)
 
     return (
         <div className="flex min-h-screen bg-background">
             {/* Sidebar Fixa */}
-            <div className="w-64 flex-none hidden md:block border-r bg-card/40 backdrop-blur-xl">
-                <Sidebar activeView={currentView} onViewChange={setCurrentView} />
+            <div className={`flex-none hidden md:block border-r bg-card/40 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"}`}>
+                <Sidebar
+                    activeView={currentView}
+                    onViewChange={setCurrentView}
+                    isCollapsed={isCollapsed}
+                    toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+                />
             </div>
 
             {/* Conteúdo Principal */}

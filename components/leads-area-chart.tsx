@@ -376,14 +376,9 @@ export function LeadsAreaChart() {
                     <CardContent>
                         <div className="flex items-baseline gap-2">
                             <div className="text-2xl font-bold">{kpis.avgConnectivity.toFixed(1)}%</div>
-                            <span className="text-xs text-muted-foreground">da meta de {connectivityTarget}%</span>
                         </div>
-                        <div className="w-full bg-secondary h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div
-                                className={`h-full rounded-full transition-all ${kpis.avgConnectivity >= connectivityTarget ? "bg-green-500" : "bg-yellow-500"}`}
-                                style={{ width: `${Math.min(100, (kpis.avgConnectivity / connectivityTarget) * 100)}%` }} // width relativo à meta? Ou absoluto? Geralmente progresso é absoluto.
-                            // Se for absoluto (0-100%): style={{ width: `${kpis.avgConnectivity}%` }}
-                            />
+                        <div className="mt-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-sm font-medium text-muted-foreground ring-1 ring-inset ring-gray-500/10">
+                            Meta: {connectivityTarget}%
                         </div>
                     </CardContent>
                 </Card>
