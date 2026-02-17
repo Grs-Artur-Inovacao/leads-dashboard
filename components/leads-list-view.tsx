@@ -19,12 +19,20 @@ import {
     PaginationPrevious,
     PaginationEllipsis
 } from "@/components/ui/pagination"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar, User, Briefcase, ShoppingBag } from "lucide-react"
+import { RefreshCw, Search, MessageSquare, Calendar, User, Briefcase, ShoppingBag, FileText, X } from "lucide-react"
 
 // --- Tipos ---
 type Lead = {
@@ -51,6 +59,7 @@ export function LeadsListView() {
     const [timeRange, setTimeRange] = useState("30d")
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
+    // Changed: default 'all' allows seeing everything, but user requested 'Conectados' behavior adjustments
     const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "cold">("all")
 
     // Paginação
@@ -167,11 +176,7 @@ export function LeadsListView() {
 
     const getAgentName = (id: string) => agentNames[id] || id
 
-    const getStatus = (interactions: number) => {
-        if (interactions > interactionThreshold) return { label: 'Conectado', variant: 'success' }
-        if (interactions > 0) return { label: 'Em Progresso', variant: 'warning' }
-        return { label: 'Novo / Frio', variant: 'neutral' }
-    }
+    const isConnected = (interactions: number) => interactions > interactionThreshold
 
     const getLeadName = (lead: Lead) => {
         if (lead.first_name || lead.last_name) {
@@ -179,6 +184,8 @@ export function LeadsListView() {
         }
         return 'Lead sem Nome'
     }
+
+    const [selectedSummary, setSelectedSummary] = useState<Lead | null>(null)
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -255,9 +262,9 @@ export function LeadsListView() {
                                 <TableHead className="w-[140px]">Data</TableHead>
                                 <TableHead className="min-w-[200px]">Lead / Empresa</TableHead>
                                 <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
-                                <TableHead>Agente</TableHead>
-                                <TableHead className="text-center">Interações</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-center">Resumo</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead className="text-right">Agente</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -265,16 +272,11 @@ export function LeadsListView() {
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={i}>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
-                                        <TableCell>
-                                            <div className="space-y-2">
-                                                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                                                <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-                                            </div>
-                                        </TableCell>
+                                        <TableCell><div className="space-y-2"><div className="h-4 w-32 bg-muted animate-pulse rounded" /><div className="h-3 w-20 bg-muted animate-pulse rounded" /></div></TableCell>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
-                                        <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-4 w-8 mx-auto bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full" /></TableCell>
+                                        <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
                                     </TableRow>
                                 ))
                             ) : leads.length === 0 ? (
@@ -285,7 +287,7 @@ export function LeadsListView() {
                                 </TableRow>
                             ) : (
                                 leads.map((lead, idx) => {
-                                    const { label, variant } = getStatus(lead.contador_interacoes)
+                                    const connected = isConnected(lead.contador_interacoes)
                                     const leadName = getLeadName(lead)
                                     const hasName = lead.first_name || lead.last_name
 
@@ -330,24 +332,64 @@ export function LeadsListView() {
                                                 )}
                                             </TableCell>
 
-                                            <TableCell>
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <User className="h-3 w-3 opacity-50" />
-                                                    {getAgentName(lead.agent_id)}
-                                                </div>
+                                            {/* Resumo da Conversa (Botão) */}
+                                            <TableCell className="text-center">
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                            <FileText className={`h-4 w-4 ${lead.summary ? 'text-blue-500' : 'text-muted-foreground/30'}`} />
+                                                            <span className="sr-only">Ver Resumo</span>
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader>
+                                                            <DialogTitle>Resumo da Conversa</DialogTitle>
+                                                            <DialogDescription>
+                                                                Detalhes gerados pela IA sobre este lead.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="mt-4 space-y-4">
+                                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                                <div>
+                                                                    <span className="text-muted-foreground block text-xs">Lead</span>
+                                                                    <span className="font-medium">{leadName}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-muted-foreground block text-xs">Empresa</span>
+                                                                    <span className="font-medium">{lead.company || '-'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto">
+                                                                {lead.summary ? (
+                                                                    <p>{lead.summary}</p>
+                                                                ) : (
+                                                                    <p className="text-muted-foreground italic">Nenhum resumo disponível para este lead.</p>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t pt-4">
+                                                                <MessageSquare className="h-3 w-3" />
+                                                                {lead.contador_interacoes} interações registradas.
+                                                            </div>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
                                             </TableCell>
 
                                             <TableCell className="text-center">
-                                                <div className="flex items-center justify-center gap-1 font-mono text-sm">
-                                                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
-                                                    {lead.contador_interacoes}
-                                                </div>
+                                                {connected && (
+                                                    <Badge variant="success">
+                                                        Conectado
+                                                    </Badge>
+                                                )}
                                             </TableCell>
 
-                                            <TableCell>
-                                                <Badge variant={variant as any}>
-                                                    {label}
-                                                </Badge>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2 text-sm">
+                                                    <span className="text-muted-foreground text-xs">{getAgentName(lead.agent_id)}</span>
+                                                    <User className="h-3 w-3 opacity-50" />
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     )
