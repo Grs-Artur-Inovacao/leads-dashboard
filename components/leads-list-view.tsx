@@ -59,7 +59,7 @@ export function LeadsListView() {
     const [timeRange, setTimeRange] = useState("30d")
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
-    // Changed: default 'all' allows seeing everything, but user requested 'Conectados' behavior adjustments
+
     const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "cold">("all")
 
     // Paginação
@@ -185,8 +185,6 @@ export function LeadsListView() {
         return 'Lead sem Nome'
     }
 
-    const [selectedSummary, setSelectedSummary] = useState<Lead | null>(null)
-
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header & Controls */}
@@ -292,7 +290,7 @@ export function LeadsListView() {
                                     const hasName = lead.first_name || lead.last_name
 
                                     return (
-                                        <TableRow key={lead.id || idx}>
+                                        <TableRow key={lead.id || idx} className="group">
                                             <TableCell className="font-medium text-muted-foreground text-xs">
                                                 <div className="flex flex-col gap-1">
                                                     <div className="flex items-center gap-1.5">
@@ -307,13 +305,13 @@ export function LeadsListView() {
 
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic'}`}>
+                                                    <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic truncate max-w-[200px] block'}`}>
                                                         {leadName}
                                                     </span>
                                                     {lead.company && (
                                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                                                             <Briefcase className="h-3 w-3" />
-                                                            {lead.company}
+                                                            <span className="truncate max-w-[180px]">{lead.company}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -336,8 +334,8 @@ export function LeadsListView() {
                                             <TableCell className="text-center">
                                                 <Dialog>
                                                     <DialogTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                            <FileText className={`h-4 w-4 ${lead.summary ? 'text-blue-500' : 'text-muted-foreground/30'}`} />
+                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 hover:opacity-100 transition-opacity">
+                                                            <FileText className={`h-4 w-4 ${lead.summary ? 'text-blue-500 fill-blue-500/10' : 'text-muted-foreground/30'}`} />
                                                             <span className="sr-only">Ver Resumo</span>
                                                         </Button>
                                                     </DialogTrigger>
@@ -345,32 +343,46 @@ export function LeadsListView() {
                                                         <DialogHeader>
                                                             <DialogTitle>Resumo da Conversa</DialogTitle>
                                                             <DialogDescription>
-                                                                Detalhes gerados pela IA sobre este lead.
+                                                                Detalhes da interação com o lead.
                                                             </DialogDescription>
                                                         </DialogHeader>
                                                         <div className="mt-4 space-y-4">
-                                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                            <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-md border">
                                                                 <div>
-                                                                    <span className="text-muted-foreground block text-xs">Lead</span>
-                                                                    <span className="font-medium">{leadName}</span>
+                                                                    <span className="text-muted-foreground block text-xs mb-1">Lead</span>
+                                                                    <div className="font-medium flex items-center gap-2">
+                                                                        <User className="h-3 w-3 text-muted-foreground" />
+                                                                        {leadName}
+                                                                    </div>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-muted-foreground block text-xs">Empresa</span>
-                                                                    <span className="font-medium">{lead.company || '-'}</span>
+                                                                    <span className="text-muted-foreground block text-xs mb-1">Empresa</span>
+                                                                    <div className="font-medium flex items-center gap-2">
+                                                                        <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                                                        {lead.company || '-'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto">
-                                                                {lead.summary ? (
-                                                                    <p>{lead.summary}</p>
-                                                                ) : (
-                                                                    <p className="text-muted-foreground italic">Nenhum resumo disponível para este lead.</p>
-                                                                )}
+                                                            <div className="space-y-2">
+                                                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conteúdo da IA</label>
+                                                                <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto border text-foreground/90">
+                                                                    {lead.summary ? (
+                                                                        <p style={{ whiteSpace: 'pre-wrap' }}>{lead.summary}</p>
+                                                                    ) : (
+                                                                        <p className="text-muted-foreground italic">Nenhum resumo disponível para este lead.</p>
+                                                                    )}
+                                                                </div>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t pt-4">
-                                                                <MessageSquare className="h-3 w-3" />
-                                                                {lead.contador_interacoes} interações registradas.
+                                                            <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <MessageSquare className="h-3 w-3" />
+                                                                    {lead.contador_interacoes} interações
+                                                                </div>
+                                                                <div>
+                                                                    ID: <span className="font-mono">{lead.id.substring(0, 8)}...</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </DialogContent>
@@ -387,8 +399,10 @@ export function LeadsListView() {
 
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2 text-sm">
-                                                    <span className="text-muted-foreground text-xs">{getAgentName(lead.agent_id)}</span>
-                                                    <User className="h-3 w-3 opacity-50" />
+                                                    <span className="text-muted-foreground text-xs font-medium">{getAgentName(lead.agent_id)}</span>
+                                                    <div className="bg-muted p-1 rounded-full">
+                                                        <User className="h-3 w-3 opacity-50" />
+                                                    </div>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
