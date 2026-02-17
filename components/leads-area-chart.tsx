@@ -18,89 +18,60 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { AgentSelector } from "./agent-selector"
-import { Users, MessageSquare, Activity } from "lucide-react"
 
-// Cores para os gráficos (padrão shadcn)
-const CHART_COLORS = [
-    "hsl(var(--chart-1))",
-    "hsl(var(--chart-2))",
-    "hsl(var(--chart-3))",
-    "hsl(var(--chart-4))",
-    "hsl(var(--chart-5))",
+interface LeadsAreaChartProps {
+    timeRange: string
+    viewMode: "total" | "connected"
+    selectedAgents: string[]
+    interactionThreshold: number
+    agentNames: Record<string, string>
+}
+
+interface ChartDataPoint {
+    date: string
+    [key: string]: number | string
+}
+
+// Paleta de cores em diferentes tons de azul
+const COLORS = [
+    "#2563eb", // blue-600
+    "#3b82f6", // blue-500
+    "#60a5fa", // blue-400
+    "#1d4ed8", // blue-700
+    "#93c5fd", // blue-300
+    "#1e40af", // blue-800
+    "#bfdbfe", // blue-200
+    "#1e3a8a", // blue-900
+    "#dbeafe", // blue-100
+    "#0f172a", // slate-900 (dark navy)
 ]
 
-export function LeadsAreaChart() {
-    // Estados de dados
-    const [chartData, setChartData] = useState<any[]>([])
-    const [availableAgents, setAvailableAgents] = useState<string[]>([])
-    const [selectedAgents, setSelectedAgents] = useState<string[]>([])
+export function LeadsAreaChart({
+    timeRange,
+    viewMode,
+    selectedAgents,
+    interactionThreshold,
+    agentNames
+}: LeadsAreaChartProps) {
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([])
 
-    // Estados de controle
-    const [loading, setLoading] = useState(true)
-    const [timeRange, setTimeRange] = useState("90d")
-    const [metricType, setMetricType] = useState<"total" | "connected">("connected")
-
-    // KPIs
-    const [kpis, setKpis] = useState({
-        totalLeads: 0,
-        connectedLeads: 0,
-        avgConnectivity: 0
-    })
-
-    // Configuração dinâmica do gráfico baseada nos agentes selecionados
+    // Gerar config do gráfico dinamicamente com base nos agentes selecionados
     const chartConfig = useMemo(() => {
         const config: ChartConfig = {}
-        selectedAgents.forEach((agent, index) => {
-            config[agent] = {
-                label: agent || "Desconhecido", // Poderíamos aplicar formatação de nome aqui
-                color: CHART_COLORS[index % CHART_COLORS.length],
+        selectedAgents.forEach((agentId, index) => {
+            config[agentId] = {
+                label: agentNames[agentId] || agentId,
+                color: COLORS[index % COLORS.length],
             }
         })
         return config
-    }, [selectedAgents])
+    }, [selectedAgents, agentNames])
 
-    // Buscar lista de agentes disponíveis
     useEffect(() => {
-        const fetchAgents = async () => {
-            const { data, error } = await supabase
-                .from('info_lead')
-                .select('agent_id')
-                .not('agent_id', 'is', null) // Ignorar nulos se houver
-
-            if (error) {
-                console.error('Erro ao buscar agentes:', error)
-                return
-            }
-
-            // Filtrar únicos e remover vazios
-            const uniqueAgents = Array.from(new Set(data?.map(d => d.agent_id).filter(Boolean) || []))
-            setAvailableAgents(uniqueAgents)
-
-            // Selecionar todos por padrão na primeira carga se nenhum estiver selecionado
-            if (selectedAgents.length === 0 && uniqueAgents.length > 0) {
-                setSelectedAgents(uniqueAgents)
-            }
-        }
-
-        fetchAgents()
-    }, []) // Executa apenas na montagem
-
-    // Função principal de busca de dados
-    const fetchLeadsData = async () => {
-        try {
-            setLoading(true)
+        const fetchLeadsData = async () => {
             let queryStart = new Date()
             let isAllTime = false
 
-            // Configurar filtro de data
             switch (timeRange) {
                 case "7d": queryStart.setDate(queryStart.getDate() - 7); break;
                 case "15d": queryStart.setDate(queryStart.getDate() - 15); break;
@@ -111,276 +82,145 @@ export function LeadsAreaChart() {
                 default: queryStart.setDate(queryStart.getDate() - 90);
             }
 
-            // Construir Query
+            // Selecionar campos necessários
             let query = supabase
                 .from('info_lead')
-                .select('created_at, agent_id, contador_interacoes')
+                .select('created_at, id_agent, contador_interacoes')
+                .not('id_agent', 'is', null) // Garantir que tem agente
                 .order('created_at', { ascending: true })
 
-            // Aplicar filtros
             if (!isAllTime) {
                 query = query.gte('created_at', queryStart.toISOString())
             }
 
             if (selectedAgents.length > 0) {
-                query = query.in('agent_id', selectedAgents)
-            } else {
-                // Se nenhum agente selecionado, não retornar dados
-                setChartData([])
-                setKpis({ totalLeads: 0, connectedLeads: 0, avgConnectivity: 0 })
-                setLoading(false)
-                return
+                query = query.in('id_agent', selectedAgents)
             }
 
             const { data, error } = await query
 
             if (error) {
                 console.error('Erro ao buscar leads:', error)
-                setLoading(false)
                 return
             }
 
-            // --- Processamento dos Dados ---
-
-            let totalLeadsCount = 0
-            let connectedLeadsCount = 0
-
-            // Mapa para agrupar por data
-            // Chave: Data (dd/mm), Valor: Objeto com contadores por agente
-            const leadsByDate = new Map<string, any>()
+            // Agrupar por data e agente
+            const leadsByDate = new Map<string, { [key: string]: number }>()
 
             data?.forEach(lead => {
-                // Parse date
-                const dateObj = new Date(lead.created_at)
-                const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) // dd/mm
-
-                // Inicializar objeto do dia se não existir
-                if (!leadsByDate.has(dateStr)) {
-                    // Inicializar contadores zerados para todos os agentes selecionados
-                    const initialData: any = { date: dateStr, fullDate: dateObj }
-                    selectedAgents.forEach(agent => {
-                        initialData[agent] = 0
-                    })
-                    leadsByDate.set(dateStr, initialData)
+                // Verificar filtro de conectados usando o threshold dinâmico
+                if (viewMode === "connected" && (lead.contador_interacoes || 0) <= interactionThreshold) {
+                    return
                 }
 
-                const dayData = leadsByDate.get(dateStr)
-                const agent = lead.agent_id
+                const date = new Date(lead.created_at)
+                const dateStr = date.toLocaleDateString('pt-BR') // dd/mm/yyyy
 
-                // Verificar conectividade
-                const isConnected = (lead.contador_interacoes || 0) > 3
+                const currentCounts = leadsByDate.get(dateStr) || {}
+                const agentKey = lead.id_agent
 
-                // Atualizar KPIs globais
-                totalLeadsCount++
-                if (isConnected) connectedLeadsCount++
-
-                // Atualizar dados do gráfico baseado na métrica selecionada
-                if (metricType === 'total') {
-                    if (selectedAgents.includes(agent)) {
-                        dayData[agent] = (dayData[agent] || 0) + 1
-                    }
-                } else {
-                    // connected
-                    if (isConnected && selectedAgents.includes(agent)) {
-                        dayData[agent] = (dayData[agent] || 0) + 1
-                    }
-                }
+                currentCounts[agentKey] = (currentCounts[agentKey] || 0) + 1
+                leadsByDate.set(dateStr, currentCounts)
             })
 
-            // Converter para array e ordenar cronologicamente
-            const sortedData = Array.from(leadsByDate.values()).sort((a, b) =>
-                a.fullDate.getTime() - b.fullDate.getTime()
-            )
-
-            setChartData(sortedData)
-            setKpis({
-                totalLeads: totalLeadsCount,
-                connectedLeads: connectedLeadsCount,
-                avgConnectivity: totalLeadsCount > 0 ? (connectedLeadsCount / totalLeadsCount) * 100 : 0
+            // Converter para array e ordenar
+            const sortedEntries = Array.from(leadsByDate.entries()).sort((a, b) => {
+                const [d1, m1, y1] = a[0].split('/').map(Number)
+                const [d2, m2, y2] = b[0].split('/').map(Number)
+                return new Date(y1, m1 - 1, d1).getTime() - new Date(y2, m2 - 1, d2).getTime()
             })
-            setLoading(false)
 
-        } catch (err) {
-            console.error('Erro:', err)
-            setLoading(false)
+            const formattedData: ChartDataPoint[] = sortedEntries.map(([date, counts]) => ({
+                date,
+                ...counts
+            }))
+
+            setChartData(formattedData)
         }
-    }
 
-    // Recarregar dados quando filtros mudam
-    useEffect(() => {
-        if (selectedAgents.length > 0 || availableAgents.length > 0) {
-            fetchLeadsData()
-        }
-    }, [timeRange, selectedAgents, metricType])
-
-    // Realtime subscription
-    useEffect(() => {
-        const channel = supabase
-            .channel('info-leads-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'info_lead' }, () => {
-                fetchLeadsData()
-            })
-            .subscribe()
-
-        return () => { supabase.removeChannel(channel) }
-    }, [timeRange, selectedAgents, metricType])
-
+        fetchLeadsData()
+    }, [timeRange, viewMode, selectedAgents, interactionThreshold])
 
     return (
-        <div className="space-y-4">
-            {/* --- Filtros e Controles Superiores --- */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-white">Análise de Performance</h2>
+        <Card className="bg-zinc-900 border-zinc-800 text-white">
+            <CardHeader className="flex flex-col items-stretch space-y-0 border-b border-zinc-800 p-0 sm:flex-row">
+                <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
+                    <CardTitle>Evolução Temporal</CardTitle>
+                    <CardDescription className="text-zinc-400">
+                        {viewMode === "total"
+                            ? "Total de novos leads por dia"
+                            : `Leads conectados (>${interactionThreshold} interações) por dia`}
+                    </CardDescription>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    <AgentSelector
-                        agents={availableAgents}
-                        selectedAgents={selectedAgents}
-                        onChange={setSelectedAgents}
-                        isLoading={loading && availableAgents.length === 0}
-                    />
-
-                    <Select value={timeRange} onValueChange={setTimeRange}>
-                        <SelectTrigger className="w-[140px] rounded-lg">
-                            <SelectValue placeholder="Período" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                            <SelectItem value="15d">Últimos 15 dias</SelectItem>
-                            <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                            <SelectItem value="60d">Últimos 60 dias</SelectItem>
-                            <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                            <SelectItem value="all">Todo o período</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            {/* --- KPI Cards --- */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpis.totalLeads}</div>
-                        <p className="text-xs text-muted-foreground">
-                            No período selecionado
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Leads Conectados</CardTitle>
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpis.connectedLeads}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {">"} 3 interações
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Taxa de Conectividade</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpis.avgConnectivity.toFixed(1)}%</div>
-                        <p className="text-xs text-muted-foreground">
-                            Eficiência geral
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* --- Chart --- */}
-            <Card>
-                <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-                    <div className="grid flex-1 gap-1 text-center sm:text-left">
-                        <CardTitle>Evolução por Agente</CardTitle>
-                        <CardDescription>
-                            Comparando performance ao longo do tempo ({metricType === 'total' ? 'Total' : 'Conectados'})
-                        </CardDescription>
-                    </div>
-                    {/* Seletor de Métrica do Gráfico */}
-                    <div className="flex items-center gap-2 rounded-md border p-1 bg-background/50">
-                        <button
-                            onClick={() => setMetricType("total")}
-                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'total' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                        >
-                            Total Leads
-                        </button>
-                        <button
-                            onClick={() => setMetricType("connected")}
-                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'connected' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                        >
-                            Conectados 🔥
-                        </button>
-                    </div>
-                </CardHeader>
-                <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-                    <ChartContainer
-                        config={chartConfig}
-                        className="aspect-auto h-[350px] w-full"
-                    >
-                        <AreaChart data={chartData}>
-                            <defs>
-                                {selectedAgents.map((agent, index) => (
-                                    <linearGradient key={agent} id={`fill${agent}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop
-                                            offset="5%"
-                                            stopColor={`var(--color-${agent})`}
-                                            stopOpacity={0.8}
-                                        />
-                                        <stop
-                                            offset="95%"
-                                            stopColor={`var(--color-${agent})`}
-                                            stopOpacity={0.1}
-                                        />
-                                    </linearGradient>
-                                ))}
-                            </defs>
-                            <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                            <XAxis
-                                dataKey="date"
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                minTickGap={32}
-                            />
-                            <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                width={30}
-                            />
-                            <ChartTooltip
-                                cursor={false}
-                                content={<ChartTooltipContent indicator="dot" />}
-                            />
-
-                            {selectedAgents.map((agent, index) => (
-                                <Area
-                                    key={agent}
-                                    dataKey={agent} // Deve corresponder à chave no config e nos dados
-                                    type="natural"
-                                    fill={`url(#fill${agent})`}
-                                    stroke={`var(--color-${agent})`} // ChartContainer define --color-{key}
-                                    fillOpacity={0.4}
-                                    strokeWidth={2}
-                                    stackId="a"
-                                />
+            </CardHeader>
+            <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+                <ChartContainer
+                    config={chartConfig}
+                    className="aspect-auto h-[350px] w-full"
+                >
+                    <AreaChart data={chartData}>
+                        <defs>
+                            {selectedAgents.map((agentId) => (
+                                <linearGradient
+                                    key={agentId}
+                                    id={`fill-${agentId}`}
+                                    x1="0"
+                                    y1="0"
+                                    x2="0"
+                                    y2="1"
+                                >
+                                    <stop
+                                        offset="5%"
+                                        stopColor={chartConfig[agentId]?.color}
+                                        stopOpacity={0.8}
+                                    />
+                                    <stop
+                                        offset="95%"
+                                        stopColor={chartConfig[agentId]?.color}
+                                        stopOpacity={0.1}
+                                    />
+                                </linearGradient>
                             ))}
-                            <ChartLegend content={<ChartLegendContent />} />
-                        </AreaChart>
-                    </ChartContainer>
-                </CardContent>
-            </Card>
-        </div>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.1)" />
+                        <XAxis
+                            dataKey="date"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                            minTickGap={32}
+                            tickFormatter={(value) => {
+                                const [day, month] = value.split('/')
+                                return `${day}/${month}`
+                            }}
+                        />
+                        <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                        />
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent indicator="dot" />}
+                        />
+
+                        {selectedAgents.map((agentId) => (
+                            <Area
+                                key={agentId}
+                                dataKey={agentId}
+                                type="monotone"
+                                fill={`url(#fill-${agentId})`}
+                                stroke={chartConfig[agentId]?.color}
+                                fillOpacity={0.4}
+                                strokeWidth={2}
+                                stackId="a"
+                            />
+                        ))}
+
+                        <ChartLegend content={<ChartLegendContent />} />
+                    </AreaChart>
+                </ChartContainer>
+            </CardContent>
+        </Card>
     )
 }
