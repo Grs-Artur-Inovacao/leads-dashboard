@@ -12,13 +12,15 @@ export interface AgentSelectorProps {
     selectedAgents: string[]
     onChange: (selected: string[]) => void
     isLoading?: boolean
+    namesMap?: Record<string, string>
 }
 
 export function AgentSelector({
     agents,
     selectedAgents,
     onChange,
-    isLoading = false
+    isLoading = false,
+    namesMap = {}
 }: AgentSelectorProps) {
     const [open, setOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -52,11 +54,9 @@ export function AgentSelector({
         }
     }
 
-    // Formatar nome do agente (opcional, se os IDs forem feios)
+    // Formatar nome do agente
     const formatAgentName = (id: string) => {
-        // Se for número de telefone, tentar formatar ou retornar o ID mesmo
-        // Ex: remover +55... se quiser
-        return id || "Desconhecido"
+        return namesMap[id] || id || "Desconhecido"
     }
 
     return (
