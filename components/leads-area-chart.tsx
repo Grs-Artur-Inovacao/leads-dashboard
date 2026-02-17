@@ -370,16 +370,16 @@ export function LeadsAreaChart() {
                             </div>
                         </div>
                         <div className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${kpis.avgConnectivity >= connectivityTarget ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500"}`}>
-                            {kpis.avgConnectivity.toFixed(1)}%
+                            Meta: {connectivityTarget}%
                         </div>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-baseline gap-2">
                             <div className="text-2xl font-bold">{kpis.avgConnectivity.toFixed(1)}%</div>
                         </div>
-                        <div className="mt-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-sm font-medium text-muted-foreground ring-1 ring-inset ring-gray-500/10">
-                            Meta: {connectivityTarget}%
-                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Leads totais vs Leads Conectados
+                        </p>
                     </CardContent>
                 </Card>
             </div>
