@@ -22,19 +22,23 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input" // Assuming Input exists or use standard input
+import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar, User } from "lucide-react"
+import { RefreshCw, Search, MessageSquare, Calendar, User, Briefcase, ShoppingBag } from "lucide-react"
 
 // --- Tipos ---
 type Lead = {
+    id: string
     created_at: string
     agent_id: string
     contador_interacoes: number
-    // Campos potencias que vamos tentar mostrar se existirem
-    id?: string
-    nome?: string
-    ultimo_mensagem?: string
+
+    // Campos Enriquecidos
+    first_name?: string
+    last_name?: string
+    company?: string
+    product?: string
+    summary?: string
 }
 
 export function LeadsListView() {
@@ -57,7 +61,7 @@ export function LeadsListView() {
     const [interactionThreshold, setInteractionThreshold] = useState(3)
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
 
-    // --- Carregar Configurações (Mesma lógica do chart) ---
+    // --- Carregar Configurações ---
     useEffect(() => {
         const loadSettings = () => {
             const savedThreshold = localStorage.getItem('leads-dashboard-threshold')
@@ -113,10 +117,6 @@ export function LeadsListView() {
             // ORDENAÇÃO
             query = query.order('created_at', { ascending: false })
 
-            // (Nota: Filtrar por status 'conectado' via SQL é complexo se 'contador_interacoes' for numérico simples,
-            // mas faremos no client ou SQL raw se necessário. Para simplificar e performar, faremos paginado e
-            // o filtro de status aplicaremos SOBRE a página ou idealmente no SQL. 
-            // Como 'contador_interacoes' é uma coluna, podemos filtrar direto!)
             if (statusFilter === 'connected') {
                 query = query.gt('contador_interacoes', interactionThreshold)
             } else if (statusFilter === 'cold') {
@@ -144,7 +144,6 @@ export function LeadsListView() {
 
     // Refresh ao mudar filtros
     useEffect(() => {
-        // Resetar para página 1 se filtros mudarem (exceto paginação)
         setCurrentPage(1)
     }, [timeRange, selectedAgents, statusFilter])
 
@@ -170,8 +169,15 @@ export function LeadsListView() {
 
     const getStatus = (interactions: number) => {
         if (interactions > interactionThreshold) return { label: 'Conectado', variant: 'success' }
-        if (interactions > 0) return { label: 'Em Progresso', variant: 'warning' } // Opcional
+        if (interactions > 0) return { label: 'Em Progresso', variant: 'warning' }
         return { label: 'Novo / Frio', variant: 'neutral' }
+    }
+
+    const getLeadName = (lead: Lead) => {
+        if (lead.first_name || lead.last_name) {
+            return `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+        }
+        return 'Lead sem Nome'
     }
 
     return (
@@ -229,14 +235,13 @@ export function LeadsListView() {
                     onChange={setSelectedAgents}
                     namesMap={agentNames}
                 />
-                {/* Search Placeholder */}
                 <div className="relative max-w-sm flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
+                    <Input
                         type="search"
-                        placeholder="Buscar ID..."
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled // Disabled for now as per plan
+                        placeholder="Buscar por ID..."
+                        className="pl-9"
+                        disabled
                     />
                 </div>
             </div>
@@ -247,53 +252,98 @@ export function LeadsListView() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[180px]">Data</TableHead>
+                                <TableHead className="w-[140px]">Data</TableHead>
+                                <TableHead className="min-w-[200px]">Lead / Empresa</TableHead>
+                                <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
                                 <TableHead>Agente</TableHead>
                                 <TableHead className="text-center">Interações</TableHead>
                                 <TableHead>Status</TableHead>
-                                {/* <TableHead>Detalhes</TableHead> */}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                // Loading State
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={i}>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
-                                        <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded" /></TableCell>
+                                        <TableCell>
+                                            <div className="space-y-2">
+                                                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                                                <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
+                                        <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-4 w-8 mx-auto bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full" /></TableCell>
                                     </TableRow>
                                 ))
                             ) : leads.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell colSpan={6} className="h-24 text-center">
                                         Nenhum lead encontrado com os filtros atuais.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 leads.map((lead, idx) => {
                                     const { label, variant } = getStatus(lead.contador_interacoes)
+                                    const leadName = getLeadName(lead)
+                                    const hasName = lead.first_name || lead.last_name
+
                                     return (
                                         <TableRow key={lead.id || idx}>
-                                            <TableCell className="font-medium text-muted-foreground">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="h-3 w-3" />
-                                                    {formatDate(lead.created_at)}
+                                            <TableCell className="font-medium text-muted-foreground text-xs">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {formatDate(lead.created_at).split(' ')[0]}
+                                                    </div>
+                                                    <span className="opacity-70 pl-4.5">
+                                                        {formatDate(lead.created_at).split(' ')[1]}
+                                                    </span>
                                                 </div>
                                             </TableCell>
+
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-col">
+                                                    <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic'}`}>
+                                                        {leadName}
+                                                    </span>
+                                                    {lead.company && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                                            <Briefcase className="h-3 w-3" />
+                                                            {lead.company}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+
+                                            <TableCell>
+                                                {lead.product ? (
+                                                    <div className="flex items-center gap-1.5 text-sm">
+                                                        <ShoppingBag className="h-3 w-3 text-muted-foreground" />
+                                                        <span className="truncate max-w-[150px]" title={lead.product}>
+                                                            {lead.product}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">-</span>
+                                                )}
+                                            </TableCell>
+
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-sm">
                                                     <User className="h-3 w-3 opacity-50" />
                                                     {getAgentName(lead.agent_id)}
                                                 </div>
                                             </TableCell>
+
                                             <TableCell className="text-center">
-                                                <div className="flex items-center justify-center gap-1 font-mono">
+                                                <div className="flex items-center justify-center gap-1 font-mono text-sm">
                                                     <MessageSquare className="h-3 w-3 text-muted-foreground" />
                                                     {lead.contador_interacoes}
                                                 </div>
                                             </TableCell>
+
                                             <TableCell>
                                                 <Badge variant={variant as any}>
                                                     {label}
@@ -320,7 +370,6 @@ export function LeadsListView() {
                             />
                         </PaginationItem>
 
-                        {/* Simple Page Indicator */}
                         <div className="flex items-center gap-1 mx-4 text-sm font-medium">
                             Página {currentPage} de {totalPages}
                         </div>
