@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
 import { AgentSelector } from "./agent-selector"
-import { Users, MessageSquare, Activity, Settings, X, Save, HelpCircle } from "lucide-react"
+import { Users, MessageSquare, Activity, Settings, HelpCircle } from "lucide-react"
 
 // --- Configurações Visuais ---
 
@@ -55,10 +55,9 @@ export function LeadsAreaChart() {
     const [totalLeadsTarget, setTotalLeadsTarget] = useState(100)
     const [connectedLeadsTarget, setConnectedLeadsTarget] = useState(50)
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
-    const [isConfigOpen, setIsConfigOpen] = useState(false)
-    const [isLoaded, setIsLoaded] = useState(false) // Para evitar salvamento inicial vazio
+    const [isLoaded, setIsLoaded] = useState(false)
 
-    // --- Efeito: Carregar Configurações do LocalStorage ---
+    // --- Efeito: Carregar Configurações e Ouvir Mudanças ---
     useEffect(() => {
         const loadSettings = () => {
             try {
@@ -79,18 +78,14 @@ export function LeadsAreaChart() {
                 setIsLoaded(true)
             }
         }
-        loadSettings()
-    }, [])
 
-    // --- Efeito: Salvar Configurações no LocalStorage ---
-    useEffect(() => {
-        if (!isLoaded) return
-        localStorage.setItem('leads-dashboard-total-target', String(totalLeadsTarget))
-        localStorage.setItem('leads-dashboard-connected-target', String(connectedLeadsTarget))
-        localStorage.setItem('leads-dashboard-threshold', String(interactionThreshold))
-        localStorage.setItem('leads-dashboard-target', String(connectivityTarget))
-        localStorage.setItem('leads-dashboard-names', JSON.stringify(agentNames))
-    }, [interactionThreshold, connectivityTarget, agentNames, isLoaded])
+        // Carregar inicialmente
+        loadSettings()
+
+        // Ouvir mudanças de outras abas/componentes
+        window.addEventListener('storage', loadSettings)
+        return () => window.removeEventListener('storage', loadSettings)
+    }, [])
 
     // --- KPIs ---
     const [kpis, setKpis] = useState({
@@ -253,118 +248,13 @@ export function LeadsAreaChart() {
         <div className="space-y-4 relative">
 
             {/* Modal de Configuração (Manual implementation) */}
-            {isConfigOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md bg-background border rounded-lg shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="font-semibold text-lg">Configurações do Dashboard</h3>
-                            <button onClick={() => setIsConfigOpen(false)} className="p-1 hover:bg-muted rounded text-muted-foreground">
-                                <X className="h-5 w-5" />
-                            </button>
-                        </div>
-                        <div className="p-4 space-y-6 max-h-[70vh] overflow-y-auto">
-
-                            {/* Thresholds */}
-                            <div className="space-y-4 border-b pb-4">
-                                <h4 className="text-sm font-medium text-muted-foreground uppercase">Métricas</h4>
-                                <div className="grid gap-2">
-                                    <label className="text-sm font-medium">
-                                        Mínimo de Interações (Conectado)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={interactionThreshold}
-                                        onChange={(e) => setInteractionThreshold(Number(e.target.value))}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                    <p className="text-xs text-muted-foreground">Considerar lead conectado após X mensagens.</p>
-                                </div>
-                                <div className="grid gap-2">
-                                    <label className="text-sm font-medium">
-                                        Meta de Conectividade (%)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1" max="100"
-                                        value={connectivityTarget}
-                                        onChange={(e) => setConnectivityTarget(Number(e.target.value))}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <label className="text-sm font-medium">
-                                        Meta Total de Leads
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={totalLeadsTarget}
-                                        onChange={(e) => setTotalLeadsTarget(Number(e.target.value))}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <label className="text-sm font-medium">
-                                        Meta Leads Conectados
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={connectedLeadsTarget}
-                                        onChange={(e) => setConnectedLeadsTarget(Number(e.target.value))}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Nomes dos Agentes */}
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-medium text-muted-foreground uppercase">Renomear Agentes</h4>
-                                {availableAgents.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">Nenhum agente carregado ainda.</p>
-                                ) : (
-                                    availableAgents.map(agent => (
-                                        <div key={agent} className="grid gap-1">
-                                            <label className="text-xs text-muted-foreground truncate" title={agent}>
-                                                {agent}
-                                            </label>
-                                            <input
-                                                type="text"
-                                                placeholder={`Apelido para ${agent}`}
-                                                value={agentNames[agent] || ""}
-                                                onChange={(e) => setAgentNames(prev => ({ ...prev, [agent]: e.target.value }))}
-                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                            />
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                        <div className="p-4 bg-muted/50 border-t flex justify-end">
-                            <button
-                                onClick={() => setIsConfigOpen(false)}
-                                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                            >
-                                <Save className="mr-2 h-4 w-4" /> Salvar e Fechar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal removido (Mochvido para aba Configurações) */}
 
 
             {/* --- Header & Filtros --- */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-foreground">Performance de Leads</h2>
-                    <button
-                        onClick={() => setIsConfigOpen(true)}
-                        className="p-2 rounded-full hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                        title="Configurações"
-                    >
-                        <Settings className="h-5 w-5" />
-                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -410,7 +300,7 @@ export function LeadsAreaChart() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
-                            {((kpis.totalLeads / (totalLeadsTarget || 1)) * 100).toFixed(0)}%
+                            Meta: {totalLeadsTarget}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -429,7 +319,7 @@ export function LeadsAreaChart() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
-                            {((kpis.connectedLeads / (connectedLeadsTarget || 1)) * 100).toFixed(0)}%
+                            Meta: {connectedLeadsTarget}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -581,7 +471,6 @@ export function LeadsAreaChart() {
                                     stroke={chartConfig[agent]?.color}
                                     fillOpacity={0.4}
                                     strokeWidth={2}
-                                    stackId="a"
                                 />
                             ))}
                             <ChartLegend content={<ChartLegendContent />} />
