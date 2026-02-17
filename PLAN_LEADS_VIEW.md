@@ -17,12 +17,16 @@ A página será estruturada usando componentes modernos do **shadcn/ui** para ma
 2.  **Resumo Rápido (Mini-KPIs)**:
     *   Uma barra superior mostrando o total de leads listados na tabela atual e quantos são qualificados como "Conectados".
 3.  **Tabela de Dados (Data Grid)**:
-    *   **Colunas Sugeridas**:
-        *   **Data/Hora**: Formato amigável (ex: Today, 14:30 ou 15/02/2026).
-        *   **Agente**: Nome do agente (usando os "apelidos" configurados nas settings).
-        *   **Interações**: Número de mensagens trocadas + Indicador visual (Barra de progresso ou cor).
-        *   **Status**: Badge colorido (Verde para Conectado, Cinza para Inicial, Amarelo para Em Progresso).
-        *   **Ações**: Botão "Ver Detalhes" (para futuro modal ou drill-down).
+    *   **Colunas Confirmadas (Mínimo Viável)**:
+        *   **Data/Hora**: Campo `created_at`.
+        *   **Agente**: Campo `agent_id` (formatado com apelido).
+        *   **Interações**: Campo `contador_interacoes` (numérico).
+        *   **Status**: Calculado no front-end baseado no `contador_interacoes`.
+    *   **Colunas a Descobrir (Ideal)**:
+        *   *ID do Lead*: Para links diretos.
+        *   *Nome do Cliente/Lead*: Se disponível na tabela `info_lead`.
+        *   *Última Mensagem*: Se disponível.
+        *   **Ações**: Botão "Ver Detalhes" (ficará desabilitado se não houver mais dados).
 4.  **Paginação**:
     *   Controles no rodapé da tabela para navegar entre páginas de resultados (10, 20, 50 itens por página).
 

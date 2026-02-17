@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { LeadsAreaChart } from "@/components/leads-area-chart"
 import { Sidebar } from "@/components/sidebar"
+import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
 import { HelpView } from "@/components/help-view"
 
@@ -28,11 +29,7 @@ export default function Home() {
 
                     {currentView === "dashboard" && <LeadsAreaChart />}
 
-                    {currentView === "leads" && (
-                        <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
-                            Em breve: Visualização Detalhada de Leads
-                        </div>
-                    )}
+                    {currentView === "leads" && <LeadsListView />}
 
                     {currentView === "reports" && (
                         <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
