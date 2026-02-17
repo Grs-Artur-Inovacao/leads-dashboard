@@ -20,7 +20,7 @@ export function Sidebar() {
     ]
 
     return (
-        <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col">
+        <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card flex flex-col">
             {/* Logo Area */}
             <div className="flex h-16 items-center border-b px-6">
                 <BarChart3 className="mr-2 h-6 w-6 text-primary" />
@@ -42,8 +42,8 @@ export function Sidebar() {
                                 variant={active === item.id ? "secondary" : "ghost"}
                                 onClick={() => setActive(item.id)}
                                 className={`w-full justify-start gap-3 text-sm font-medium ${active === item.id
-                                        ? "bg-primary/10 text-primary hover:bg-primary/20"
-                                        : "text-muted-foreground hover:text-foreground"
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "text-muted-foreground hover:text-foreground"
                                     }`}
                             >
                                 <item.icon className="h-4 w-4" />

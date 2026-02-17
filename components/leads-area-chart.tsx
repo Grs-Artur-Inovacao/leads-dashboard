@@ -52,6 +52,8 @@ export function LeadsAreaChart() {
     // --- Configurações Personalizáveis ---
     const [interactionThreshold, setInteractionThreshold] = useState(3)
     const [connectivityTarget, setConnectivityTarget] = useState(30) // %
+    const [totalLeadsTarget, setTotalLeadsTarget] = useState(100)
+    const [connectedLeadsTarget, setConnectedLeadsTarget] = useState(50)
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
     const [isConfigOpen, setIsConfigOpen] = useState(false)
     const [isLoaded, setIsLoaded] = useState(false) // Para evitar salvamento inicial vazio
@@ -60,10 +62,14 @@ export function LeadsAreaChart() {
     useEffect(() => {
         const loadSettings = () => {
             try {
+                const savedTotal = localStorage.getItem('leads-dashboard-total-target')
+                const savedConnected = localStorage.getItem('leads-dashboard-connected-target')
                 const savedThreshold = localStorage.getItem('leads-dashboard-threshold')
                 const savedTarget = localStorage.getItem('leads-dashboard-target')
                 const savedNames = localStorage.getItem('leads-dashboard-names')
 
+                if (savedTotal) setTotalLeadsTarget(Number(savedTotal))
+                if (savedConnected) setConnectedLeadsTarget(Number(savedConnected))
                 if (savedThreshold) setInteractionThreshold(Number(savedThreshold))
                 if (savedTarget) setConnectivityTarget(Number(savedTarget))
                 if (savedNames) setAgentNames(JSON.parse(savedNames))
@@ -79,6 +85,8 @@ export function LeadsAreaChart() {
     // --- Efeito: Salvar Configurações no LocalStorage ---
     useEffect(() => {
         if (!isLoaded) return
+        localStorage.setItem('leads-dashboard-total-target', String(totalLeadsTarget))
+        localStorage.setItem('leads-dashboard-connected-target', String(connectedLeadsTarget))
         localStorage.setItem('leads-dashboard-threshold', String(interactionThreshold))
         localStorage.setItem('leads-dashboard-target', String(connectivityTarget))
         localStorage.setItem('leads-dashboard-names', JSON.stringify(agentNames))
@@ -284,6 +292,30 @@ export function LeadsAreaChart() {
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
                                 </div>
+                                <div className="grid gap-2">
+                                    <label className="text-sm font-medium">
+                                        Meta Total de Leads
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={totalLeadsTarget}
+                                        onChange={(e) => setTotalLeadsTarget(Number(e.target.value))}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <label className="text-sm font-medium">
+                                        Meta Leads Conectados
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={connectedLeadsTarget}
+                                        onChange={(e) => setConnectedLeadsTarget(Number(e.target.value))}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                </div>
                             </div>
 
                             {/* Nomes dos Agentes */}
@@ -377,7 +409,9 @@ export function LeadsAreaChart() {
                                 <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
                             </div>
                         </div>
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {((kpis.totalLeads / (totalLeadsTarget || 1)) * 100).toFixed(0)}%
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{kpis.totalLeads}</div>
@@ -394,7 +428,9 @@ export function LeadsAreaChart() {
                                 <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
                             </div>
                         </div>
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {((kpis.connectedLeads / (connectedLeadsTarget || 1)) * 100).toFixed(0)}%
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{kpis.connectedLeads}</div>
@@ -411,7 +447,9 @@ export function LeadsAreaChart() {
                                 <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
                             </div>
                         </div>
-                        <Activity className={`h-4 w-4 ${kpis.avgConnectivity >= connectivityTarget ? "text-green-500" : "text-yellow-500"}`} />
+                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${kpis.avgConnectivity >= connectivityTarget ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500"}`}>
+                            {kpis.avgConnectivity.toFixed(1)}%
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-baseline gap-2">
@@ -453,7 +491,7 @@ export function LeadsAreaChart() {
                             onClick={() => setMetricType("connected")}
                             className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'connected' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
                         >
-                            Conectados 🔥
+                            Conectados
                         </button>
                         <button
                             onClick={() => setMetricType("comparison")}
@@ -512,41 +550,40 @@ export function LeadsAreaChart() {
                                 content={<ChartTooltipContent indicator="dot" />}
                             />
 
-                            {metricType === 'comparison' ? (
-                                <>
-                                    <Area
-                                        dataKey="total"
-                                        name="Total"
-                                        type="monotone"
-                                        fill="url(#fillTotal)"
-                                        stroke="#3b82f6"
-                                        fillOpacity={1}
-                                        strokeWidth={2}
-                                    />
-                                    <Area
-                                        dataKey="connected"
-                                        name="Conectados"
-                                        type="monotone"
-                                        fill="url(#fillConnected)"
-                                        stroke="#10b981"
-                                        fillOpacity={1}
-                                        strokeWidth={2}
-                                    />
-                                </>
-                            ) : (
-                                selectedAgents.map((agent: string, index: number) => (
-                                    <Area
-                                        key={agent}
-                                        dataKey={agent}
-                                        type="monotone" // Suavização melhor
-                                        fill={`url(#fill${agent})`}
-                                        stroke={chartConfig[agent]?.color}
-                                        fillOpacity={0.4}
-                                        strokeWidth={2}
-                                        stackId="a"
-                                    />
-                                ))
+                            {metricType === 'comparison' && (
+                                <Area
+                                    dataKey="total"
+                                    name="Total"
+                                    type="monotone"
+                                    fill="url(#fillTotal)"
+                                    stroke="#3b82f6"
+                                    fillOpacity={1}
+                                    strokeWidth={2}
+                                />
                             )}
+                            {metricType === 'comparison' && (
+                                <Area
+                                    dataKey="connected"
+                                    name="Conectados"
+                                    type="monotone"
+                                    fill="url(#fillConnected)"
+                                    stroke="#10b981"
+                                    fillOpacity={1}
+                                    strokeWidth={2}
+                                />
+                            )}
+                            {metricType !== 'comparison' && selectedAgents.map((agent: string, index: number) => (
+                                <Area
+                                    key={agent}
+                                    dataKey={agent}
+                                    type="monotone" // Suavização melhor
+                                    fill={`url(#fill${agent})`}
+                                    stroke={chartConfig[agent]?.color}
+                                    fillOpacity={0.4}
+                                    strokeWidth={2}
+                                    stackId="a"
+                                />
+                            ))}
                             <ChartLegend content={<ChartLegendContent />} />
                         </AreaChart>
                     </ChartContainer>
