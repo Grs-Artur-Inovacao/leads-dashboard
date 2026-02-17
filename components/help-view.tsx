@@ -2,7 +2,6 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import ReactMarkdown from 'react-markdown'
 import { useEffect, useState } from "react"
 
 export function HelpView() {

@@ -134,17 +134,18 @@ export function LeadsAreaChart() {
     const fetchLeadsData = async () => {
         try {
             setLoading(true)
-            let queryStart = new Date()
+            const endDate = new Date()
+            const startDate = new Date()
             let isAllTime = false
 
             switch (timeRange) {
-                case "7d": queryStart.setDate(queryStart.getDate() - 7); break;
-                case "15d": queryStart.setDate(queryStart.getDate() - 15); break;
-                case "30d": queryStart.setDate(queryStart.getDate() - 30); break;
-                case "60d": queryStart.setDate(queryStart.getDate() - 60); break;
-                case "90d": queryStart.setDate(queryStart.getDate() - 90); break;
+                case "7d": startDate.setDate(endDate.getDate() - 7); break;
+                case "15d": startDate.setDate(endDate.getDate() - 15); break;
+                case "30d": startDate.setDate(endDate.getDate() - 30); break;
+                case "60d": startDate.setDate(endDate.getDate() - 60); break;
+                case "90d": startDate.setDate(endDate.getDate() - 90); break;
                 case "all": isAllTime = true; break;
-                default: queryStart.setDate(queryStart.getDate() - 90);
+                default: startDate.setDate(endDate.getDate() - 90);
             }
 
             let query = supabase
@@ -153,7 +154,7 @@ export function LeadsAreaChart() {
                 .order('created_at', { ascending: true })
 
             if (!isAllTime) {
-                query = query.gte('created_at', queryStart.toISOString())
+                query = query.gte('created_at', startDate.toISOString())
             }
 
             if (selectedAgents.length > 0) {
@@ -177,13 +178,43 @@ export function LeadsAreaChart() {
             let totalLeadsCount = 0
             let connectedLeadsCount = 0
             const leadsByDate = new Map<string, any>()
+
+            // 1. Inicializar todas as datas do intervalo (Preenchimento de Zeros)
+            // Se for 'all', usamos a data do primeiro lead ou 30 dias atrás se vazio
+            let fillStart = startDate
+            if (isAllTime) {
+                if (data && data.length > 0) {
+                    fillStart = new Date(data[0].created_at)
+                } else {
+                    fillStart = new Date()
+                    fillStart.setDate(fillStart.getDate() - 30)
+                }
+            }
+
+            // Iterar dia a dia até hoje
+            for (let d = new Date(fillStart); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                if (!leadsByDate.has(dateStr)) {
+                    const initialData: any = { date: dateStr, fullDate: new Date(d) }
+                    selectedAgents.forEach((agent: string) => initialData[agent] = 0)
+                    // Inicializar totais para modo Comparação
+                    initialData['total'] = 0
+                    initialData['connected'] = 0
+                    leadsByDate.set(dateStr, initialData)
+                }
+            }
+
+            // 2. Preencher com dados reais
             data?.forEach((lead: any) => {
                 const dateObj = new Date(lead.created_at)
                 const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
+                // Se a data estiver fora do range inicializado (ex: caso raro de fuso horário), adiciona
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: dateObj }
                     selectedAgents.forEach((agent: string) => initialData[agent] = 0)
+                    initialData['total'] = 0
+                    initialData['connected'] = 0
                     leadsByDate.set(dateStr, initialData)
                 }
 
@@ -194,19 +225,20 @@ export function LeadsAreaChart() {
                 totalLeadsCount++
                 if (isConnected) connectedLeadsCount++
 
-                if (metricType === 'total') {
-                    if (selectedAgents.includes(agent)) dayData[agent] = (dayData[agent] || 0) + 1
-                } else if (metricType === 'connected') {
-                    if (isConnected && selectedAgents.includes(agent)) dayData[agent] = (dayData[agent] || 0) + 1
-                } else {
-                    // Comparison Mode: Aggregate
-                    if (selectedAgents.includes(agent)) {
-                        dayData['total'] = (dayData['total'] || 0) + 1
-                        if (isConnected) dayData['connected'] = (dayData['connected'] || 0) + 1
+                // Atualizar contagens
+                if (selectedAgents.includes(agent)) {
+                    // Contagem por Agente
+                    dayData[agent] = (dayData[agent] || 0) + 1
+
+                    // Contagem Total (para Comparativo)
+                    dayData['total'] = (dayData['total'] || 0) + 1
+                    if (isConnected) {
+                        dayData['connected'] = (dayData['connected'] || 0) + 1
                     }
                 }
             })
 
+            // 3. Ordenar e Setar
             const sortedData = Array.from(leadsByDate.values()).sort((a, b) =>
                 a.fullDate.getTime() - b.fullDate.getTime()
             )
