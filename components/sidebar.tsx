@@ -1,11 +1,14 @@
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, LogOut } from "lucide-react"
-import { useState } from "react"
+import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function Sidebar() {
-    const [active, setActive] = useState("dashboard")
+interface SidebarProps {
+    activeView: string
+    onViewChange: (view: string) => void
+}
+
+export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,9 +42,9 @@ export function Sidebar() {
                         {menuItems.map((item) => (
                             <Button
                                 key={item.id}
-                                variant={active === item.id ? "secondary" : "ghost"}
-                                onClick={() => setActive(item.id)}
-                                className={`w-full justify-start gap-3 text-sm font-medium ${active === item.id
+                                variant={activeView === item.id ? "secondary" : "ghost"}
+                                onClick={() => onViewChange(item.id)}
+                                className={`w-full justify-start gap-3 text-sm font-medium ${activeView === item.id
                                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                                     : "text-muted-foreground hover:text-foreground"
                                     }`}
@@ -62,9 +65,12 @@ export function Sidebar() {
                         {bottomItems.map((item) => (
                             <Button
                                 key={item.id}
-                                variant="ghost"
-                                onClick={() => setActive(item.id)}
-                                className="w-full justify-start gap-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+                                variant={activeView === item.id ? "secondary" : "ghost"}
+                                onClick={() => onViewChange(item.id)}
+                                className={`w-full justify-start gap-3 text-sm font-medium ${activeView === item.id
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "text-muted-foreground hover:text-foreground"
+                                    }`}
                             >
                                 <item.icon className="h-4 w-4" />
                                 {item.label}
@@ -72,17 +78,6 @@ export function Sidebar() {
                         ))}
                     </nav>
                 </div>
-            </div>
-
-            {/* Footer (Logout) */}
-            <div className="border-t p-4">
-                <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-3 text-sm font-medium text-red-500 hover:bg-red-500/10 hover:text-red-600"
-                >
-                    <LogOut className="h-4 w-4" />
-                    Sair
-                </Button>
             </div>
         </aside>
     )
