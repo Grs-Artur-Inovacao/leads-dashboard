@@ -53,13 +53,42 @@ export function LeadsAreaChart() {
     // --- Estados de Controle ---
     const [loading, setLoading] = useState(true)
     const [timeRange, setTimeRange] = useState("90d")
-    const [metricType, setMetricType] = useState<"total" | "connected">("connected")
+    const [metricType, setMetricType] = useState<"total" | "connected" | "comparison">("connected")
 
     // --- Configurações Personalizáveis ---
     const [interactionThreshold, setInteractionThreshold] = useState(3)
     const [connectivityTarget, setConnectivityTarget] = useState(30) // %
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
     const [isConfigOpen, setIsConfigOpen] = useState(false)
+    const [isLoaded, setIsLoaded] = useState(false) // Para evitar salvamento inicial vazio
+
+    // --- Efeito: Carregar Configurações do LocalStorage ---
+    useEffect(() => {
+        const loadSettings = () => {
+            try {
+                const savedThreshold = localStorage.getItem('leads-dashboard-threshold')
+                const savedTarget = localStorage.getItem('leads-dashboard-target')
+                const savedNames = localStorage.getItem('leads-dashboard-names')
+
+                if (savedThreshold) setInteractionThreshold(Number(savedThreshold))
+                if (savedTarget) setConnectivityTarget(Number(savedTarget))
+                if (savedNames) setAgentNames(JSON.parse(savedNames))
+            } catch (e) {
+                console.error("Erro ao carregar configurações", e)
+            } finally {
+                setIsLoaded(true)
+            }
+        }
+        loadSettings()
+    }, [])
+
+    // --- Efeito: Salvar Configurações no LocalStorage ---
+    useEffect(() => {
+        if (!isLoaded) return
+        localStorage.setItem('leads-dashboard-threshold', String(interactionThreshold))
+        localStorage.setItem('leads-dashboard-target', String(connectivityTarget))
+        localStorage.setItem('leads-dashboard-names', JSON.stringify(agentNames))
+    }, [interactionThreshold, connectivityTarget, agentNames, isLoaded])
 
     // --- KPIs ---
     const [kpis, setKpis] = useState({
@@ -71,7 +100,7 @@ export function LeadsAreaChart() {
     // --- Config do Gráfico ---
     const chartConfig = useMemo(() => {
         const config: ChartConfig = {}
-        selectedAgents.forEach((agentId, index) => {
+        selectedAgents.forEach((agentId: string, index: number) => {
             config[agentId] = {
                 label: agentNames[agentId] || agentId,
                 color: BLUE_PALETTE[index % BLUE_PALETTE.length],
@@ -151,14 +180,13 @@ export function LeadsAreaChart() {
             let totalLeadsCount = 0
             let connectedLeadsCount = 0
             const leadsByDate = new Map<string, any>()
-
-            data?.forEach(lead => {
+            data?.forEach((lead: any) => {
                 const dateObj = new Date(lead.created_at)
                 const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: dateObj }
-                    selectedAgents.forEach(agent => initialData[agent] = 0)
+                    selectedAgents.forEach((agent: string) => initialData[agent] = 0)
                     leadsByDate.set(dateStr, initialData)
                 }
 
@@ -171,8 +199,14 @@ export function LeadsAreaChart() {
 
                 if (metricType === 'total') {
                     if (selectedAgents.includes(agent)) dayData[agent] = (dayData[agent] || 0) + 1
-                } else {
+                } else if (metricType === 'connected') {
                     if (isConnected && selectedAgents.includes(agent)) dayData[agent] = (dayData[agent] || 0) + 1
+                } else {
+                    // Comparison Mode: Aggregate
+                    if (selectedAgents.includes(agent)) {
+                        dayData['total'] = (dayData['total'] || 0) + 1
+                        if (isConnected) dayData['connected'] = (dayData['connected'] || 0) + 1
+                    }
                 }
             })
 
@@ -385,7 +419,10 @@ export function LeadsAreaChart() {
                     <div className="grid flex-1 gap-1 text-center sm:text-left">
                         <CardTitle>Evolução Temporal</CardTitle>
                         <CardDescription>
-                            Comparando performance ({metricType === 'total' ? 'Total' : 'Conectados'})
+                            {metricType === 'comparison'
+                                ? "Comparativo: Total vs Conectados"
+                                : `Comparando performance (${metricType === 'total' ? 'Total' : 'Conectados'})`
+                            }
                         </CardDescription>
                     </div>
                     {/* Seletor de Métrica do Gráfico */}
@@ -402,6 +439,12 @@ export function LeadsAreaChart() {
                         >
                             Conectados 🔥
                         </button>
+                        <button
+                            onClick={() => setMetricType("comparison")}
+                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'comparison' ? 'bg-background shadow-sm text-foreground font-medium text-blue-500' : 'text-muted-foreground hover:bg-background/50'}`}
+                        >
+                            Comparativo VS
+                        </button>
                     </div>
                 </CardHeader>
                 <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
@@ -411,7 +454,15 @@ export function LeadsAreaChart() {
                     >
                         <AreaChart data={chartData}>
                             <defs>
-                                {selectedAgents.map((agent, index) => (
+                                <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
+                                </linearGradient>
+                                <linearGradient id="fillConnected" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
+                                </linearGradient>
+                                {selectedAgents.map((agent: string, index: number) => (
                                     <linearGradient key={agent} id={`fill${agent}`} x1="0" y1="0" x2="0" y2="1">
                                         <stop
                                             offset="5%"
@@ -445,18 +496,41 @@ export function LeadsAreaChart() {
                                 content={<ChartTooltipContent indicator="dot" />}
                             />
 
-                            {selectedAgents.map((agent, index) => (
-                                <Area
-                                    key={agent}
-                                    dataKey={agent}
-                                    type="monotone" // Suavização melhor
-                                    fill={`url(#fill${agent})`}
-                                    stroke={chartConfig[agent]?.color}
-                                    fillOpacity={0.4}
-                                    strokeWidth={2}
-                                    stackId={metricType === 'total' ? "stack" : undefined} // Stacked apenas para Total? Ou sempre? Sobreposto é melhor pra comparar conectividade
-                                />
-                            ))}
+                            {metricType === 'comparison' ? (
+                                <>
+                                    <Area
+                                        dataKey="total"
+                                        name="Total"
+                                        type="monotone"
+                                        fill="url(#fillTotal)"
+                                        stroke="#3b82f6"
+                                        fillOpacity={1}
+                                        strokeWidth={2}
+                                    />
+                                    <Area
+                                        dataKey="connected"
+                                        name="Conectados"
+                                        type="monotone"
+                                        fill="url(#fillConnected)"
+                                        stroke="#10b981"
+                                        fillOpacity={1}
+                                        strokeWidth={2}
+                                    />
+                                </>
+                            ) : (
+                                selectedAgents.map((agent: string, index: number) => (
+                                    <Area
+                                        key={agent}
+                                        dataKey={agent}
+                                        type="monotone" // Suavização melhor
+                                        fill={`url(#fill${agent})`}
+                                        stroke={chartConfig[agent]?.color}
+                                        fillOpacity={0.4}
+                                        strokeWidth={2}
+                                        stackId={metricType === 'total' ? "stack" : undefined} // Stacked apenas para Total? Ou sempre? Sobreposto é melhor pra comparar conectividade
+                                    />
+                                ))
+                            )}
                             <ChartLegend content={<ChartLegendContent />} />
                         </AreaChart>
                     </ChartContainer>
