@@ -1,14 +1,23 @@
 "use client"
 
 import { LeadsAreaChart } from "@/components/leads-area-chart"
+import { Sidebar } from "@/components/sidebar"
 
 export default function Home() {
     return (
-        <main className="flex min-h-screen flex-col items-center bg-black text-white">
-            <div className="w-full px-4 py-8 md:px-8 max-w-7xl mx-auto">
-                {/* O LeadsAreaChart agora gerencia todo o dashboard (KPIs, Filtros, Gráfico) */}
-                <LeadsAreaChart />
+        <div className="flex min-h-screen bg-background">
+            {/* Sidebar Fixa */}
+            <div className="w-64 flex-none hidden md:block border-r bg-card/40 backdrop-blur-xl"> {/* Ajustado para não quebrar em mobile, mas idealmente seria responsive */}
+                <Sidebar />
             </div>
-        </main>
+
+            {/* Conteúdo Principal */}
+            <main className="flex-1 w-full md:pl-64 transition-all duration-300">
+                <div className="container mx-auto p-6 md:p-8 max-w-[1600px] space-y-8">
+                    {/* Header Mobile se necessário */}
+                    <LeadsAreaChart />
+                </div>
+            </main>
+        </div>
     )
 }

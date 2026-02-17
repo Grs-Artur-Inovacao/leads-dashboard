@@ -18,15 +18,9 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import { AgentSelector } from "./agent-selector"
-import { Users, MessageSquare, Activity, Settings, X, Save } from "lucide-react"
+import { Users, MessageSquare, Activity, Settings, X, Save, HelpCircle } from "lucide-react"
 
 // --- Configurações Visuais ---
 
@@ -350,19 +344,26 @@ export function LeadsAreaChart() {
                         namesMap={agentNames}
                     />
 
-                    <Select value={timeRange} onValueChange={setTimeRange}>
-                        <SelectTrigger className="w-[140px] rounded-lg">
-                            <SelectValue placeholder="Período" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                            <SelectItem value="15d">Últimos 15 dias</SelectItem>
-                            <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                            <SelectItem value="60d">Últimos 60 dias</SelectItem>
-                            <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                            <SelectItem value="all">Todo o período</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex items-center bg-muted/30 p-1 rounded-lg border shadow-sm">
+                        {['7d', '15d', '30d', '60d', '90d', 'all'].map((range) => (
+                            <Button
+                                key={range}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setTimeRange(range)}
+                                className={`
+                                    h-7 px-3 text-xs font-medium rounded-none first:rounded-l-md last:rounded-r-md border-r border-transparent 
+                                    hover:bg-transparent hover:text-foreground
+                                    ${timeRange === range
+                                        ? "bg-background text-foreground shadow-sm z-20 font-semibold ring-1 ring-border"
+                                        : "text-muted-foreground/70 hover:bg-background/50"
+                                    }
+                                `}
+                            >
+                                {range === 'all' ? 'Tudo' : range}
+                            </Button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -370,37 +371,52 @@ export function LeadsAreaChart() {
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
+                            <div title="Total de leads únicos recebidos no período selecionado.">
+                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
+                            </div>
+                        </div>
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{kpis.totalLeads}</div>
-                        <p className="text-xs text-muted-foreground">
-                            No período selecionado
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Leads únicos recebidos no período
                         </p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Leads Conectados</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-sm font-medium">Leads Conectados</CardTitle>
+                            <div title={`Leads com mais de ${interactionThreshold} interações, considerados 'Validados'.`}>
+                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
+                            </div>
+                        </div>
                         <MessageSquare className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{kpis.connectedLeads}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {">"} {interactionThreshold} interações
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Leads com mais de {interactionThreshold} interações
                         </p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Taxa de Conectividade</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-sm font-medium">Taxa de Conectividade</CardTitle>
+                            <div title={`Porcentagem de leads que se tornaram conectados. Meta: ${connectivityTarget}%.`}>
+                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
+                            </div>
+                        </div>
                         <Activity className={`h-4 w-4 ${kpis.avgConnectivity >= connectivityTarget ? "text-green-500" : "text-yellow-500"}`} />
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-baseline gap-2">
                             <div className="text-2xl font-bold">{kpis.avgConnectivity.toFixed(1)}%</div>
-                            <span className="text-xs text-muted-foreground">Meta: {connectivityTarget}%</span>
+                            <span className="text-xs text-muted-foreground">da meta de {connectivityTarget}%</span>
                         </div>
                         <div className="w-full bg-secondary h-1.5 rounded-full mt-2 overflow-hidden">
                             <div
@@ -527,7 +543,7 @@ export function LeadsAreaChart() {
                                         stroke={chartConfig[agent]?.color}
                                         fillOpacity={0.4}
                                         strokeWidth={2}
-                                        stackId={metricType === 'total' ? "stack" : undefined} // Stacked apenas para Total? Ou sempre? Sobreposto é melhor pra comparar conectividade
+                                        stackId="a"
                                     />
                                 ))
                             )}
