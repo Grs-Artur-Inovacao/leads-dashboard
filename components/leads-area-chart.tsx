@@ -494,7 +494,7 @@ export function LeadsAreaChart() {
                                     <Area
                                         key={agent}
                                         dataKey={metricType === 'connected' ? `${agent}_connected` : agent}
-                                        name={chartConfig[agent]?.label as string}
+                                        name={(chartConfig[agent]?.label as string) || agent}
                                         type="monotone"
                                         fill={`url(#fill${agent})`}
                                         stroke={chartConfig[agent]?.color}
