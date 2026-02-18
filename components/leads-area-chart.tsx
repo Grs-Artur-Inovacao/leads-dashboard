@@ -19,8 +19,18 @@ import {
     ChartTooltipContent,
 } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import { AgentSelector } from "./agent-selector"
-import { Users, MessageSquare, Activity, Settings, HelpCircle } from "lucide-react"
+import { Users, MessageSquare, Activity, Settings, HelpCircle, Calendar as CalendarIcon } from "lucide-react"
+import { format, subDays } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { DateRange } from "react-day-picker"
+import { cn } from "@/lib/utils"
 
 // --- Configurações Visuais ---
 
@@ -45,8 +55,12 @@ export function LeadsAreaChart() {
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
 
     // --- Estados de Controle ---
+    // --- Estados de Controle ---
     const [loading, setLoading] = useState(true)
-    const [timeRange, setTimeRange] = useState("90d")
+    const [date, setDate] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 7),
+        to: new Date(),
+    })
     const [metricType, setMetricType] = useState<"total" | "connected" | "comparison">("connected")
 
     // --- Configurações Personalizáveis ---
@@ -134,28 +148,20 @@ export function LeadsAreaChart() {
     const fetchLeadsData = async () => {
         try {
             setLoading(true)
-            const endDate = new Date()
-            const startDate = new Date()
-            let isAllTime = false
 
-            switch (timeRange) {
-                case "7d": startDate.setDate(endDate.getDate() - 7); break;
-                case "15d": startDate.setDate(endDate.getDate() - 15); break;
-                case "30d": startDate.setDate(endDate.getDate() - 30); break;
-                case "60d": startDate.setDate(endDate.getDate() - 60); break;
-                case "90d": startDate.setDate(endDate.getDate() - 90); break;
-                case "all": isAllTime = true; break;
-                default: startDate.setDate(endDate.getDate() - 90);
-            }
+            const fromDate = date?.from || subDays(new Date(), 7)
+            const toDate = date?.to || new Date()
+
+            // Adjust to end of day for toDate to include all entries on that day
+            const queryEndDate = new Date(toDate)
+            queryEndDate.setHours(23, 59, 59, 999)
 
             let query = supabase
                 .from('info_lead')
                 .select('created_at, agent_id, contador_interacoes')
                 .order('created_at', { ascending: true })
-
-            if (!isAllTime) {
-                query = query.gte('created_at', startDate.toISOString())
-            }
+                .gte('created_at', fromDate.toISOString())
+                .lte('created_at', queryEndDate.toISOString())
 
             if (selectedAgents.length > 0) {
                 query = query.in('agent_id', selectedAgents)
@@ -180,17 +186,9 @@ export function LeadsAreaChart() {
             const leadsByDate = new Map<string, any>()
 
             // 1. Inicializar todas as datas do intervalo
-            let fillStart = startDate
-            if (isAllTime) {
-                if (data && data.length > 0) {
-                    fillStart = new Date(data[0].created_at)
-                } else {
-                    fillStart = new Date()
-                    fillStart.setDate(fillStart.getDate() - 30)
-                }
-            }
+            let fillStart = new Date(fromDate)
 
-            for (let d = new Date(fillStart); d <= endDate; d.setDate(d.getDate() + 1)) {
+            for (let d = new Date(fillStart); d <= toDate; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: new Date(d) }
@@ -268,7 +266,7 @@ export function LeadsAreaChart() {
         if (selectedAgents.length > 0 || availableAgents.length > 0) {
             fetchLeadsData()
         }
-    }, [timeRange, selectedAgents, metricType, interactionThreshold])
+    }, [date, selectedAgents, metricType, interactionThreshold])
 
     useEffect(() => {
         const channel = supabase
@@ -278,7 +276,7 @@ export function LeadsAreaChart() {
             })
             .subscribe()
         return () => { supabase.removeChannel(channel) }
-    }, [timeRange, selectedAgents, metricType, interactionThreshold])
+    }, [date, selectedAgents, metricType, interactionThreshold])
 
 
     // --- Render ---
@@ -299,25 +297,46 @@ export function LeadsAreaChart() {
                         namesMap={agentNames}
                     />
 
-                    <div className="flex items-center bg-muted/30 p-1 rounded-lg border shadow-sm">
-                        {['7d', '15d', '30d', '60d', '90d', 'all'].map((range) => (
-                            <Button
-                                key={range}
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setTimeRange(range)}
-                                className={`
-                                    h-7 px-3 text-xs font-medium rounded-none first:rounded-l-md last:rounded-r-md border-r border-transparent 
-                                    hover:bg-transparent hover:text-foreground
-                                    ${timeRange === range
-                                        ? "bg-background text-foreground shadow-sm z-20 font-semibold ring-1 ring-border"
-                                        : "text-muted-foreground/70 hover:bg-background/50"
-                                    }
-                                `}
-                            >
-                                {range === 'all' ? 'Tudo' : range}
-                            </Button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <div className="grid gap-2">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        id="date"
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-[260px] justify-start text-left font-normal",
+                                            !date && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {date?.from ? (
+                                            date.to ? (
+                                                <>
+                                                    {format(date.from, "dd 'de' MMM", { locale: ptBR })} -{" "}
+                                                    {format(date.to, "dd 'de' MMM", { locale: ptBR })}
+                                                </>
+                                            ) : (
+                                                format(date.from, "dd 'de' MMM, yyyy", { locale: ptBR })
+                                            )
+                                        ) : (
+                                            <span>Selecione uma data</span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="end">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={date?.from}
+                                        selected={date}
+                                        onSelect={setDate}
+                                        numberOfMonths={2}
+                                        locale={ptBR}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
                 </div>
             </div>
