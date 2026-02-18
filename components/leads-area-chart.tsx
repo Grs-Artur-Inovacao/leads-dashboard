@@ -508,3 +508,6 @@ export function LeadsAreaChart() {
                     </ChartContainer>
                 </CardContent>
             </Card>
+        </div>
+    )
+}
