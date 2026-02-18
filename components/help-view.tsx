@@ -1,45 +1,54 @@
-
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { useEffect, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 export function HelpView() {
     const [content, setContent] = useState("")
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        // In a real app we might fetch this. For now we just import string or show static.
-        // But since we can't easily import a md file in client component without loader config, 
-        // we will fetch it from public or just show a message if file reading is complex in this environment.
-        // Let's assume we fetch from a local file path if we had API, but here we can just hardcode the
-        // "placeholder" behavior or try to fetch if we put it in public.
-        // User asked for "texto em formato .md".
+        async function loadContent() {
+            try {
+                const response = await fetch("/ajuda.md")
+                if (response.ok) {
+                    const text = await response.text()
+                    setContent(text)
+                } else {
+                    setContent("Erro ao carregar a documentação. Verifique se o arquivo public/ajuda.md existe.")
+                }
+            } catch (error) {
+                setContent("Erro ao carregar a documentação.")
+                console.error(error)
+            } finally {
+                setLoading(false)
+            }
+        }
 
-        // Simulating loading the content
-        setContent(`# Central de Ajuda
-        
-**Bem vindo ao Leads Monitor.**
-
-Este documento será atualizado em breve com instruções detalhadas sobre:
-- Como interpretar os gráficos
-- Configurações de métricas
-- Definição de metas
-
-*Aguarde atualizações do administrador.*`)
+        loadContent()
     }, [])
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto pb-10">
             <h2 className="text-2xl font-bold tracking-tight">Ajuda & Documentação</h2>
             <Card>
-                <CardContent className="pt-6 prose prose-invert max-w-none">
-                    {/* Since we don't have react-markdown installed in dependencies list (assumed), 
-                        we should be careful. I will use simple whitespace rendering if markdown lib is missing.
-                        Actually, I'll just render it as pre-wrap text if I can't confirm libraries. 
-                    */}
-                    <div className="whitespace-pre-wrap text-muted-foreground font-mono text-sm">
-                        {content}
-                    </div>
+                <CardContent className="pt-6">
+                    {loading ? (
+                        <div className="flex justify-center p-8 text-muted-foreground">
+                            Carregando...
+                        </div>
+                    ) : (
+                        <article className="prose prose-stone dark:prose-invert max-w-none 
+                            prose-headings:scroll-mt-20 prose-headings:font-bold prose-headings:tracking-tight
+                            prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                            prose-img:rounded-md prose-img:shadow-md">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {content}
+                            </ReactMarkdown>
+                        </article>
+                    )}
                 </CardContent>
             </Card>
         </div>
