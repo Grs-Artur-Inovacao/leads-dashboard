@@ -179,8 +179,7 @@ export function LeadsAreaChart() {
             let connectedLeadsCount = 0
             const leadsByDate = new Map<string, any>()
 
-            // 1. Inicializar todas as datas do intervalo (Preenchimento de Zeros)
-            // Se for 'all', usamos a data do primeiro lead ou 30 dias atrás se vazio
+            // 1. Inicializar todas as datas do intervalo
             let fillStart = startDate
             if (isAllTime) {
                 if (data && data.length > 0) {
@@ -191,13 +190,14 @@ export function LeadsAreaChart() {
                 }
             }
 
-            // Iterar dia a dia até hoje
             for (let d = new Date(fillStart); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: new Date(d) }
-                    selectedAgents.forEach((agent: string) => initialData[agent] = 0)
-                    // Inicializar totais para modo Comparação
+                    selectedAgents.forEach((agent: string) => {
+                        initialData[agent] = 0 // Total
+                        initialData[`${agent}_connected`] = 0 // Conectado
+                    })
                     initialData['total'] = 0
                     initialData['connected'] = 0
                     leadsByDate.set(dateStr, initialData)
@@ -209,10 +209,12 @@ export function LeadsAreaChart() {
                 const dateObj = new Date(lead.created_at)
                 const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
-                // Se a data estiver fora do range inicializado (ex: caso raro de fuso horário), adiciona
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: dateObj }
-                    selectedAgents.forEach((agent: string) => initialData[agent] = 0)
+                    selectedAgents.forEach((agent: string) => {
+                        initialData[agent] = 0
+                        initialData[`${agent}_connected`] = 0
+                    })
                     initialData['total'] = 0
                     initialData['connected'] = 0
                     leadsByDate.set(dateStr, initialData)
@@ -225,12 +227,16 @@ export function LeadsAreaChart() {
                 totalLeadsCount++
                 if (isConnected) connectedLeadsCount++
 
-                // Atualizar contagens
                 if (selectedAgents.includes(agent)) {
-                    // Contagem por Agente
+                    // Contagem Total por Agente
                     dayData[agent] = (dayData[agent] || 0) + 1
 
-                    // Contagem Total (para Comparativo)
+                    // Contagem Conectados por Agente
+                    if (isConnected) {
+                        dayData[`${agent}_connected`] = (dayData[`${agent}_connected`] || 0) + 1
+                    }
+
+                    // Totais Globais (para Modo Comparativo)
                     dayData['total'] = (dayData['total'] || 0) + 1
                     if (isConnected) {
                         dayData['connected'] = (dayData['connected'] || 0) + 1
@@ -262,7 +268,7 @@ export function LeadsAreaChart() {
         if (selectedAgents.length > 0 || availableAgents.length > 0) {
             fetchLeadsData()
         }
-    }, [timeRange, selectedAgents, metricType, interactionThreshold]) // Re-fetch se threshold mudar
+    }, [timeRange, selectedAgents, metricType, interactionThreshold])
 
     useEffect(() => {
         const channel = supabase
@@ -278,12 +284,7 @@ export function LeadsAreaChart() {
     // --- Render ---
     return (
         <div className="space-y-4 relative">
-
-            {/* Modal de Configuração (Manual implementation) */}
-            {/* Modal removido (Mochvido para aba Configurações) */}
-
-
-            {/* --- Header & Filtros --- */}
+            {/* Header & Filtros */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-foreground">Performance de Leads</h2>
@@ -321,7 +322,7 @@ export function LeadsAreaChart() {
                 </div>
             </div>
 
-            {/* --- KPI Cards --- */}
+            {/* KPI Cards */}
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -384,7 +385,7 @@ export function LeadsAreaChart() {
                 </Card>
             </div>
 
-            {/* --- Chart --- */}
+            {/* Chart */}
             <Card>
                 <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
                     <div className="grid flex-1 gap-1 text-center sm:text-left">
@@ -467,44 +468,43 @@ export function LeadsAreaChart() {
                                 content={<ChartTooltipContent indicator="dot" />}
                             />
 
-                            {metricType === 'comparison' && (
-                                <Area
-                                    dataKey="total"
-                                    name="Total"
-                                    type="monotone"
-                                    fill="url(#fillTotal)"
-                                    stroke="#3b82f6"
-                                    fillOpacity={1}
-                                    strokeWidth={2}
-                                />
+                            {metricType === 'comparison' ? (
+                                <>
+                                    <Area
+                                        dataKey="total"
+                                        name="Total"
+                                        type="monotone"
+                                        fill="url(#fillTotal)"
+                                        stroke="#3b82f6"
+                                        fillOpacity={1}
+                                        strokeWidth={2}
+                                    />
+                                    <Area
+                                        dataKey="connected"
+                                        name="Conectados"
+                                        type="monotone"
+                                        fill="url(#fillConnected)"
+                                        stroke="#10b981"
+                                        fillOpacity={1}
+                                        strokeWidth={2}
+                                    />
+                                </>
+                            ) : (
+                                selectedAgents.map((agent: string, index: number) => (
+                                    <Area
+                                        key={agent}
+                                        dataKey={metricType === 'connected' ? `${agent}_connected` : agent}
+                                        name={chartConfig[agent]?.label}
+                                        type="monotone"
+                                        fill={`url(#fill${agent})`}
+                                        stroke={chartConfig[agent]?.color}
+                                        fillOpacity={0.4}
+                                        strokeWidth={2}
+                                    />
+                                ))
                             )}
-                            {metricType === 'comparison' && (
-                                <Area
-                                    dataKey="connected"
-                                    name="Conectados"
-                                    type="monotone"
-                                    fill="url(#fillConnected)"
-                                    stroke="#10b981"
-                                    fillOpacity={1}
-                                    strokeWidth={2}
-                                />
-                            )}
-                            {metricType !== 'comparison' && selectedAgents.map((agent: string, index: number) => (
-                                <Area
-                                    key={agent}
-                                    dataKey={agent}
-                                    type="monotone" // Suavização melhor
-                                    fill={`url(#fill${agent})`}
-                                    stroke={chartConfig[agent]?.color}
-                                    fillOpacity={0.4}
-                                    strokeWidth={2}
-                                />
-                            ))}
                             <ChartLegend content={<ChartLegendContent />} />
                         </AreaChart>
                     </ChartContainer>
                 </CardContent>
             </Card>
-        </div>
-    )
-}
