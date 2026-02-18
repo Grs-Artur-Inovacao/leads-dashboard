@@ -1,7 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { LeadsAreaChart } from "@/components/leads-area-chart"
+import dynamic from "next/dynamic"
+
+const LeadsAreaChart = dynamic(
+    () => import("@/components/leads-area-chart").then((mod) => mod.LeadsAreaChart),
+    { ssr: false }
+)
 import { Sidebar } from "@/components/sidebar"
 import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
@@ -14,7 +19,7 @@ export default function Home() {
     return (
         <div className="flex min-h-screen bg-background">
             {/* Sidebar Fixa */}
-            <div className={`flex-none hidden md:block border-r bg-card/40 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"}`}>
+            <div className={`sticky top-0 h-screen z-40 flex-none hidden md:block transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"}`}>
                 <Sidebar
                     activeView={currentView}
                     onViewChange={setCurrentView}

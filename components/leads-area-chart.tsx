@@ -26,11 +26,13 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { AgentSelector } from "./agent-selector"
+import { KpiCard } from "./kpi-card"
 import { Users, MessageSquare, Activity, Settings, HelpCircle, Calendar as CalendarIcon } from "lucide-react"
-import { format, subDays } from "date-fns"
+import { format, subDays, differenceInDays, getDaysInMonth, eachDayOfInterval } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
+import { settingsService } from "@/lib/settings-service"
 
 // --- Configurações Visuais ---
 
@@ -68,24 +70,25 @@ export function LeadsAreaChart() {
     const [connectivityTarget, setConnectivityTarget] = useState(30) // %
     const [totalLeadsTarget, setTotalLeadsTarget] = useState(100)
     const [connectedLeadsTarget, setConnectedLeadsTarget] = useState(50)
+    const [mqlTarget, setMqlTarget] = useState(10) // Novo estado para Meta MQL
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
     const [isLoaded, setIsLoaded] = useState(false)
 
+
     // --- Efeito: Carregar Configurações e Ouvir Mudanças ---
     useEffect(() => {
-        const loadSettings = () => {
+        const loadSettings = async () => {
             try {
-                const savedTotal = localStorage.getItem('leads-dashboard-total-target')
-                const savedConnected = localStorage.getItem('leads-dashboard-connected-target')
-                const savedThreshold = localStorage.getItem('leads-dashboard-threshold')
-                const savedTarget = localStorage.getItem('leads-dashboard-target')
-                const savedNames = localStorage.getItem('leads-dashboard-names')
+                const settings = await settingsService.getSettings()
 
-                if (savedTotal) setTotalLeadsTarget(Number(savedTotal))
-                if (savedConnected) setConnectedLeadsTarget(Number(savedConnected))
-                if (savedThreshold) setInteractionThreshold(Number(savedThreshold))
-                if (savedTarget) setConnectivityTarget(Number(savedTarget))
-                if (savedNames) setAgentNames(JSON.parse(savedNames))
+                if (settings) {
+                    setTotalLeadsTarget(settings.total_leads_target || 100)
+                    setConnectedLeadsTarget(settings.connected_leads_target || 50)
+                    setInteractionThreshold(settings.interaction_threshold || 3)
+                    setConnectivityTarget(settings.connectivity_target || 30)
+                    setMqlTarget(settings.mql_target || 10)
+                    setAgentNames(settings.agent_names || {})
+                }
             } catch (e) {
                 console.error("Erro ao carregar configurações", e)
             } finally {
@@ -96,9 +99,19 @@ export function LeadsAreaChart() {
         // Carregar inicialmente
         loadSettings()
 
-        // Ouvir mudanças de outras abas/componentes
-        window.addEventListener('storage', loadSettings)
-        return () => window.removeEventListener('storage', loadSettings)
+        // Ouvir mudanças em tempo real via Supabase
+        const subscription = settingsService.subscribeToSettings((newSettings) => {
+            setTotalLeadsTarget(newSettings.total_leads_target)
+            setConnectedLeadsTarget(newSettings.connected_leads_target)
+            setInteractionThreshold(newSettings.interaction_threshold)
+            setConnectivityTarget(newSettings.connectivity_target)
+            setMqlTarget(newSettings.mql_target)
+            setAgentNames(newSettings.agent_names || {})
+        })
+
+        return () => {
+            subscription.unsubscribe()
+        }
     }, [])
 
     // --- KPIs ---
@@ -107,6 +120,32 @@ export function LeadsAreaChart() {
         connectedLeads: 0,
         avgConnectivity: 0
     })
+
+    const [previousKpis, setPreviousKpis] = useState({
+        totalLeads: 0,
+        connectedLeads: 0,
+        avgConnectivity: 0
+    })
+
+    // Função para calcular meta proporcional ao período selecionado
+    const calculateProportionalTarget = (monthlyTarget: number, dateRange: DateRange | undefined) => {
+        if (!dateRange?.from) return monthlyTarget
+        const end = dateRange.to || dateRange.from
+
+        try {
+            const days = eachDayOfInterval({ start: dateRange.from, end })
+            let totalTarget = 0
+            days.forEach(day => {
+                const daysInMonth = getDaysInMonth(day)
+                if (daysInMonth > 0) {
+                    totalTarget += (monthlyTarget / daysInMonth)
+                }
+            })
+            return Math.round(totalTarget)
+        } catch (e) {
+            return monthlyTarget
+        }
+    }
 
     // --- Config do Gráfico ---
     const chartConfig = useMemo(() => {
@@ -152,10 +191,16 @@ export function LeadsAreaChart() {
             const fromDate = date?.from || subDays(new Date(), 7)
             const toDate = date?.to || new Date()
 
-            // Adjust to end of day for toDate to include all entries on that day
+            // Adjust to end of day
             const queryEndDate = new Date(toDate)
             queryEndDate.setHours(23, 59, 59, 999)
 
+            // --- Período Anterior (Comparação) ---
+            const durationInDays = differenceInDays(queryEndDate, fromDate) + 1
+            const previousFromDate = subDays(fromDate, durationInDays)
+            const previousToDate = subDays(queryEndDate, durationInDays)
+
+            // Query Atual
             let query = supabase
                 .from('info_lead')
                 .select('created_at, agent_id, contador_interacoes')
@@ -163,22 +208,51 @@ export function LeadsAreaChart() {
                 .gte('created_at', fromDate.toISOString())
                 .lte('created_at', queryEndDate.toISOString())
 
+            // Query Anterior
+            let previousQuery = supabase
+                .from('info_lead')
+                .select('created_at, agent_id, contador_interacoes')
+                .gte('created_at', previousFromDate.toISOString())
+                .lte('created_at', previousToDate.toISOString())
+
+
             if (selectedAgents.length > 0) {
                 query = query.in('agent_id', selectedAgents)
+                previousQuery = previousQuery.in('agent_id', selectedAgents)
             } else {
                 setChartData([])
                 setKpis({ totalLeads: 0, connectedLeads: 0, avgConnectivity: 0 })
+                setPreviousKpis({ totalLeads: 0, connectedLeads: 0, avgConnectivity: 0 })
                 setLoading(false)
                 return
             }
 
-            const { data, error } = await query
+            const [currentResult, previousResult] = await Promise.all([
+                query,
+                previousQuery
+            ])
 
-            if (error) {
-                console.error('Erro ao buscar leads:', error)
-                setLoading(false)
-                return
-            }
+            if (currentResult.error) throw currentResult.error
+            if (previousResult.error) throw previousResult.error
+
+            const data = currentResult.data
+            const previousData = previousResult.data
+
+            // --- Processamento Período Anterior ---
+            let prevTotal = 0
+            let prevConnected = 0
+
+            previousData?.forEach((lead: any) => {
+                const isConnected = (lead.contador_interacoes || 0) > interactionThreshold
+                prevTotal++
+                if (isConnected) prevConnected++
+            })
+
+            setPreviousKpis({
+                totalLeads: prevTotal,
+                connectedLeads: prevConnected,
+                avgConnectivity: prevTotal > 0 ? (prevConnected / prevTotal) * 100 : 0
+            })
 
             // --- Processamento ---
             let totalLeadsCount = 0
@@ -343,65 +417,41 @@ export function LeadsAreaChart() {
 
             {/* KPI Cards */}
             <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-                            <div title="Total de leads únicos recebidos no período selecionado.">
-                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
-                            Meta: {totalLeadsTarget}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpis.totalLeads}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Leads únicos recebidos no período
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="text-sm font-medium">Leads Conectados</CardTitle>
-                            <div title={`Leads com mais de ${interactionThreshold} interações, considerados 'Validados'.`}>
-                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-xs font-bold px-2 py-0.5 rounded-full">
-                            Meta: {connectedLeadsTarget}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpis.connectedLeads}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Leads com mais de {interactionThreshold} interações
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="text-sm font-medium">Taxa de Conectividade</CardTitle>
-                            <div title={`Porcentagem de leads que se tornaram conectados. Meta: ${connectivityTarget}%.`}>
-                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help opacity-70 hover:opacity-100" />
-                            </div>
-                        </div>
-                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${kpis.avgConnectivity >= connectivityTarget ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500"}`}>
-                            Meta: {connectivityTarget}%
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-baseline gap-2">
-                            <div className="text-2xl font-bold">{kpis.avgConnectivity.toFixed(1)}%</div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Leads totais vs Leads Conectados
-                        </p>
-                    </CardContent>
-                </Card>
+                <KpiCard
+                    title="Leads Totais"
+                    value={kpis.totalLeads}
+                    goal={calculateProportionalTarget(totalLeadsTarget, date)}
+                    currentValue={kpis.totalLeads}
+                    previousValue={previousKpis.totalLeads}
+                    description={`Total de leads únicos recebidos no período (${format(date?.from || new Date(), "dd/MM")} - ${format(date?.to || new Date(), "dd/MM")}).`}
+                />
+                <KpiCard
+                    title="Leads Conectados"
+                    value={kpis.connectedLeads}
+                    goal={calculateProportionalTarget(connectedLeadsTarget, date)}
+                    currentValue={kpis.connectedLeads}
+                    previousValue={previousKpis.connectedLeads}
+                    description={`Leads que tiveram mais de ${interactionThreshold} interações.`}
+                    secondaryMetric={{
+                        label: "Conversão (Lead → Conectado)",
+                        value: `${kpis.avgConnectivity.toFixed(1)}%`,
+                        goal: connectivityTarget
+                    }}
+                />
+                <KpiCard
+                    title="Leads MQL"
+                    value="..."
+                    goal={0}
+                    currentValue={0}
+                    previousValue={0}
+                    description="Leads qualificados pelo time de pré-vendas."
+                    isPlaceholder={true}
+                    secondaryMetric={{
+                        label: "Conversão (Conectado → MQL)",
+                        value: "...",
+                        goal: mqlTarget
+                    }}
+                />
             </div>
 
             {/* Chart */}

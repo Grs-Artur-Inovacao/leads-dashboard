@@ -27,7 +27,7 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
 
     return (
         <aside className={cn(
-            "fixed left-0 top-0 z-40 h-screen border-r bg-card flex flex-col transition-all duration-300",
+            "h-full border-r bg-card flex flex-col transition-all duration-300",
             isCollapsed ? "w-20" : "w-64"
         )}>
             {/* Logo Area */}
