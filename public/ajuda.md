@@ -8,7 +8,7 @@ Abaixo você encontrará o detalhamento completo do fluxo da nossa assistente vi
 
 A **Renatinha** é o coração da nossa automação de atendimento. O diagrama abaixo ilustra a jornada completa do lead, desde a captação via anúncios até o processamento inteligente de dados, integrações com CRM e regras de follow-up.
 
-![Fluxo Completo](/public/help-images/complet_flow.png)
+![Fluxo Completo](/help-images/complet_flow.png)
 
 ### Passo 1: Entrada de Leads e Registro
 Tudo começa com a interação do usuário.
@@ -17,7 +17,7 @@ Tudo começa com a interação do usuário.
 2.  **Primeiro Contato**: Se o usuário enviar a primeira mensagem via WhatsApp, o sistema consulta a tabela `campaign_log` para identificar a origem do lead.
 3.  **Não Contactou**: Se o usuário não enviar a primeira mensagem via WhatsApp, o timer automático na tabela `campaign_log` será acionado e será enviado um disparo para aquele contato.
 
-![Entrada de Leads](/public/help-images/Step_1.png)
+![Entrada de Leads](/help-images/Step_1.png)
 
 ### Passo 2: O Núcleo da Renatinha
 O "cérebro" da operação. A aplicação recebe a mensagem do usuário e processa a intenção.
@@ -25,7 +25,7 @@ O "cérebro" da operação. A aplicação recebe a mensagem do usuário e proces
 -   **Loop de Conversação**: O sistema baseia-se em um loop de pergunta e resposta.
 -   **Roteamento**: Baseado na mensagem, a Renatinha decide se deve responder automaticamente, acionar uma ferramenta específica ou encerrar o atendimento.
 
-![Funções da Renatinha](/public/help-images/Step_2.png)
+![Funções da Renatinha](/help-images/Step_2.png)
 
 #### Passo 2.1: Habilidades e Ferramentas (Skills)
 
@@ -34,7 +34,7 @@ Para garantir a precisão das respostas, a Renatinha utiliza ferramentas de cons
 *   **Base de Dados Atual:** O sistema opera com um banco de dados do `supabase` estático contendo informações consolidadas de Janeiro.
 *   **Integração Futura:** Esta estrutura será substituída em breve por uma integração direta com o **Data Lake do Salesforce**, permitindo o acesso a dados dinâmicos e atualizados em tempo real.
 
-![Base de Conhecimento](/public//help-images/Step_2.1.png)
+![Base de Conhecimento](/help-images/Step_2.1.png)
 
 ### Passo 3: Estrutura de Dados e Integrações
 Onde as informações residem e como são sincronizadas para garantir a inteligência do fluxo.
@@ -45,7 +45,7 @@ Onde as informações residem e como são sincronizadas para garantir a intelig�
 *   **Formulários de Captura**: Além do fluxo conversacional, são utilizados formulários específicos para a ingestão estruturada de dados dos leads.
 *   **Otimização de Público (Facebook)**: Leads qualificados geram feedback automático para o Facebook, permitindo o ajuste fino dos algoritmos de anúncio e a melhoria contínua do público-alvo.
 
-![Estrutura de Informações](/public/help-images/Step_3.png)
+![Estrutura de Informações](/help-images/Step_3.png)
 
 ### Passo 4: Fluxo de Follow-up (Retenção)
 Nenhum lead é deixado para trás. O sistema possui um ciclo de verificação automática:
@@ -61,7 +61,7 @@ Nenhum lead é deixado para trás. O sistema possui um ciclo de verificação au
 
 5.  **Resposta ao Salesforce**: Caso tenhamos todas as informações do cliente o sistema envia automaticamente o resumo da conversa e o status atualizado do lead para o CRM, garantindo que a equipe comercial tenha visibilidade total do histórico.
 
-![Fluxo de Follow UP](/public/help-images/Step_4.png)
+![Fluxo de Follow UP](/help-images/Step_4.png)
 
 ---
 

@@ -41,7 +41,9 @@ export function HelpView() {
                         </div>
                     ) : (
                         <article className="prose prose-stone dark:prose-invert max-w-none 
-                            prose-headings:scroll-mt-20 prose-headings:font-bold prose-headings:tracking-tight
+                            prose-headings:text-foreground prose-headings:font-bold prose-headings:tracking-tight
+                            prose-p:text-foreground prose-strong:text-foreground
+                            prose-ul:text-foreground prose-li:text-foreground
                             prose-a:text-primary prose-a:no-underline hover:prose-a:underline
                             prose-img:rounded-md prose-img:shadow-md">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
