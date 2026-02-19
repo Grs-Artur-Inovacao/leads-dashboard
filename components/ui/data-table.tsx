@@ -7,7 +7,6 @@ import {
     flexRender,
     getCoreRowModel,
     useReactTable,
-    getPaginationRowModel,
     SortingState,
     getSortedRowModel,
 } from "@tanstack/react-table"
@@ -36,12 +35,6 @@ export function DataTable<TData, TValue>({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        // Since pagination is server-side in this app, we don't enable client-side pagination here by default
-        // unless we want to paginate the current page (which is silly).
-        // But sorting: if we sort client-side, it sorts only the current page.
-        // If the user wants server-side sorting, we need to lift state up.
-        // For now, let's keep it simple: just render.
-        // However, basic sorting might be nice for visual organization.
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
         state: {
@@ -50,14 +43,14 @@ export function DataTable<TData, TValue>({
     })
 
     return (
-        <div className="rounded-md border border-neutral-800 bg-[#09090b]">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
             <Table>
-                <TableHeader className="bg-neutral-900 border-b border-neutral-800">
+                <TableHeader className="bg-muted/30 border-b border-border">
                     {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id} className="hover:bg-neutral-900 border-neutral-800">
+                        <TableRow key={headerGroup.id} className="hover:bg-transparent border-border">
                             {headerGroup.headers.map((header) => {
                                 return (
-                                    <TableHead key={header.id} className="text-neutral-200 font-semibold text-sm h-12">
+                                    <TableHead key={header.id} className="text-muted-foreground font-semibold text-xs uppercase tracking-wider h-11 px-4">
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(
@@ -76,10 +69,10 @@ export function DataTable<TData, TValue>({
                             <TableRow
                                 key={row.id}
                                 data-state={row.getIsSelected() && "selected"}
-                                className="border-neutral-800 hover:bg-neutral-900/30 data-[state=selected]:bg-neutral-900"
+                                className="border-border hover:bg-muted/20 data-[state=selected]:bg-muted/30 transition-colors"
                             >
                                 {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} className="py-3 text-neutral-300">
+                                    <TableCell key={cell.id} className="py-3 px-4 text-sm">
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                     </TableCell>
                                 ))}
@@ -87,8 +80,8 @@ export function DataTable<TData, TValue>({
                         ))
                     ) : (
                         <TableRow>
-                            <TableCell colSpan={columns.length} className="h-24 text-center">
-                                Sem resultados.
+                            <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground italic">
+                                Nenhum resultado encontrado.
                             </TableCell>
                         </TableRow>
                     )}

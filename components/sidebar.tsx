@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -17,10 +17,11 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         { id: "leads", label: "Leads Detalhados", icon: Users },
         { id: "reports", label: "Relatórios", icon: FileText },
-        { id: "analytics", label: "Analytics", icon: BarChart3 },
+        { id: "insights", label: "Analytics", icon: BarChart3 },
     ]
 
     const bottomItems = [
+        { id: "updates", label: "Novidades", icon: Sparkles },
         { id: "settings", label: "Configurações", icon: Settings },
         { id: "help", label: "Ajuda", icon: HelpCircle },
     ]
