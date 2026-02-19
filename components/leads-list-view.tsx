@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import {
     Table,
@@ -10,6 +10,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
 import {
     Pagination,
     PaginationContent,
@@ -32,7 +34,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar, User, Briefcase, ShoppingBag, FileText, X } from "lucide-react"
+import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2 } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format, subDays } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { DateRange } from "react-day-picker"
+import { cn } from "@/lib/utils"
 
 // --- Tipos ---
 type Lead = {
@@ -56,7 +64,10 @@ export function LeadsListView() {
     const [count, setCount] = useState(0)
 
     // Filtros
-    const [timeRange, setTimeRange] = useState("30d")
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 30),
+        to: new Date(),
+    })
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
 
@@ -110,12 +121,13 @@ export function LeadsListView() {
                 .select('*', { count: 'exact' })
 
             // Filtro de Data
-            const now = new Date()
-            let startDate = new Date()
-            if (timeRange !== 'all') {
-                const days = Number(timeRange.replace('d', ''))
-                startDate.setDate(now.getDate() - days)
-                query = query.gte('created_at', startDate.toISOString())
+            if (dateRange?.from) {
+                query = query.gte('created_at', dateRange.from.toISOString())
+            }
+            if (dateRange?.to) {
+                const endOfDay = new Date(dateRange.to)
+                endOfDay.setHours(23, 59, 59, 999)
+                query = query.lte('created_at', endOfDay.toISOString())
             }
 
             // Filtro de Agentes
@@ -154,11 +166,11 @@ export function LeadsListView() {
     // Refresh ao mudar filtros
     useEffect(() => {
         setCurrentPage(1)
-    }, [timeRange, selectedAgents, statusFilter])
+    }, [dateRange, selectedAgents, statusFilter])
 
     useEffect(() => {
         fetchLeads()
-    }, [currentPage, timeRange, selectedAgents, statusFilter, interactionThreshold])
+    }, [currentPage, dateRange, selectedAgents, statusFilter, interactionThreshold])
 
 
     // --- Helpers ---
@@ -185,6 +197,164 @@ export function LeadsListView() {
         return 'Lead sem Nome'
     }
 
+    const columns: ColumnDef<Lead>[] = useMemo(() => [
+        {
+            accessorKey: "created_at",
+            header: "Data",
+            cell: ({ row }) => {
+                const date = formatDate(row.getValue("created_at"))
+                return (
+                    <div className="flex flex-col gap-1 text-xs">
+                        <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                            <CalendarIcon className="h-3 w-3" />
+                            {date.split(' ')[0]}
+                        </div>
+                        <span className="opacity-70 pl-4.5 text-muted-foreground">
+                            {date.split(' ')[1]}
+                        </span>
+                    </div>
+                )
+            }
+        },
+        {
+            id: "lead_info",
+            header: "Lead / Empresa",
+            cell: ({ row }) => {
+                const lead = row.original
+                const leadName = getLeadName(lead)
+                const hasName = lead.first_name || lead.last_name
+                return (
+                    <div className="flex flex-col">
+                        <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic truncate max-w-[200px] block'}`}>
+                            {leadName}
+                        </span>
+                        {lead.company && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <Briefcase className="h-3 w-3" />
+                                <span className="truncate max-w-[180px]">{lead.company}</span>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+        },
+        {
+            accessorKey: "product",
+            header: "Interesse (Produto)",
+            cell: ({ row }) => {
+                const product = row.getValue("product") as string
+                return product ? (
+                    <div className="flex items-center gap-1.5 text-sm">
+                        <ShoppingBag className="h-3 w-3 text-muted-foreground" />
+                        <span className="truncate max-w-[150px]" title={product}>
+                            {product}
+                        </span>
+                    </div>
+                ) : (
+                    <span className="text-xs text-muted-foreground italic">-</span>
+                )
+            }
+        },
+        {
+            id: "actions",
+            header: () => <div className="text-center">Resumo</div>,
+            cell: ({ row }) => {
+                const lead = row.original
+                const leadName = getLeadName(lead)
+                return (
+                    <div className="flex justify-center">
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 hover:opacity-100 transition-opacity">
+                                    <FileText className={`h-4 w-4 ${lead.summary ? 'text-white fill-white/10' : 'text-muted-foreground/30'}`} />
+                                    <span className="sr-only">Ver Resumo</span>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Resumo da Conversa</DialogTitle>
+                                    <DialogDescription>
+                                        Detalhes da interação com o lead.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="mt-4 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-md border">
+                                        <div>
+                                            <span className="text-muted-foreground block text-xs mb-1">Lead</span>
+                                            <div className="font-medium flex items-center gap-2">
+                                                <User className="h-3 w-3 text-muted-foreground" />
+                                                {leadName}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground block text-xs mb-1">Empresa</span>
+                                            <div className="font-medium flex items-center gap-2">
+                                                <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                                {lead.company || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conteúdo da IA</label>
+                                        <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto border text-foreground/90">
+                                            {lead.summary ? (
+                                                <p style={{ whiteSpace: 'pre-wrap' }}>{lead.summary}</p>
+                                            ) : (
+                                                <p className="text-muted-foreground italic">Nenhum resumo disponível para este lead.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
+                                        <div className="flex items-center gap-2">
+                                            <MessageSquare className="h-3 w-3" />
+                                            {lead.contador_interacoes} interações
+                                        </div>
+                                        <div>
+                                            ID: <span className="font-mono">{lead.id.substring(0, 8)}...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                )
+            }
+        },
+        {
+            id: "status",
+            header: () => <div className="text-center">Status</div>,
+            cell: ({ row }) => {
+                const connected = isConnected(row.original.contador_interacoes)
+                if (!connected) return <div className="text-center text-muted-foreground">-</div>
+
+                return (
+                    <div className="flex justify-center">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 text-xs font-medium">
+                            <CheckCircle2 className="h-3.5 w-3.5 fill-emerald-500 text-black" strokeWidth={3} />
+                            <span>Conectado</span>
+                        </div>
+                    </div>
+                )
+            }
+        },
+        {
+            accessorKey: "agent_id",
+            header: () => <div className="text-right">Agente</div>,
+            cell: ({ row }) => {
+                return (
+                    <div className="flex items-center justify-end gap-2 text-sm">
+                        <span className="text-muted-foreground text-xs font-medium">{getAgentName(row.getValue("agent_id"))}</span>
+                        <div className="bg-muted p-1 rounded-full">
+                            <User className="h-3 w-3 opacity-50" />
+                        </div>
+                    </div>
+                )
+            }
+        },
+    ], [agentNames, interactionThreshold]) // Re-memoize if dependencies change
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Header & Controls */}
@@ -201,33 +371,45 @@ export function LeadsListView() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
-                    {/* Status Filter */}
-                    <div className="flex bg-muted p-1 rounded-md">
-                        {[
-                            { id: 'all', label: 'Todos' },
-                            { id: 'connected', label: 'Conectados' },
-                            { id: 'cold', label: 'Frios' }
-                        ].map(s => (
-                            <button
-                                key={s.id}
-                                onClick={() => setStatusFilter(s.id as any)}
-                                className={`px-3 py-1 text-xs rounded-sm transition-all ${statusFilter === s.id ? 'bg-background shadow font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                {s.label}
-                            </button>
-                        ))}
-                    </div>
 
                     <div className="flex items-center bg-muted/50 p-1 rounded-lg border">
-                        {['7d', '15d', '30d', 'all'].map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setTimeRange(range)}
-                                className={`px-3 py-1 text-xs rounded-sm transition-all ${timeRange === range ? 'bg-background shadow text-foreground font-medium' : 'text-muted-foreground hover:bg-background/50'}`}
-                            >
-                                {range === 'all' ? 'Tudo' : range}
-                            </button>
-                        ))}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="date"
+                                    variant={"ghost"}
+                                    className={cn(
+                                        "w-[240px] justify-start text-left font-normal text-xs h-8",
+                                        !dateRange && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                                    {dateRange?.from ? (
+                                        dateRange.to ? (
+                                            <>
+                                                {format(dateRange.from, "dd 'de' MMM", { locale: ptBR })} -{" "}
+                                                {format(dateRange.to, "dd 'de' MMM", { locale: ptBR })}
+                                            </>
+                                        ) : (
+                                            format(dateRange.from, "dd 'de' MMM, yyyy", { locale: ptBR })
+                                        )
+                                    ) : (
+                                        <span>Selecione uma data</span>
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRange?.from}
+                                    selected={dateRange}
+                                    onSelect={setDateRange}
+                                    numberOfMonths={2}
+                                    locale={ptBR}
+                                />
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
             </div>
@@ -251,23 +433,42 @@ export function LeadsListView() {
                 </div>
             </div>
 
+
+
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1 bg-neutral-900/50 p-1 w-fit rounded-lg border border-neutral-800">
+                {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'connected', label: 'Conectados' },
+                    { id: 'cold', label: 'Frios' }
+                ].map(s => (
+                    <button
+                        key={s.id}
+                        onClick={() => setStatusFilter(s.id as any)}
+                        className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${statusFilter === s.id ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'}`}
+                    >
+                        {s.label}
+                    </button>
+                ))}
+            </div>
+
             {/* Table */}
-            <Card>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[140px]">Data</TableHead>
-                                <TableHead className="min-w-[200px]">Lead / Empresa</TableHead>
-                                <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
-                                <TableHead className="text-center">Resumo</TableHead>
-                                <TableHead className="text-center">Status</TableHead>
-                                <TableHead className="text-right">Agente</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
+            {
+                loading ? (
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[140px]">Data</TableHead>
+                                    <TableHead className="min-w-[200px]">Lead / Empresa</TableHead>
+                                    <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
+                                    <TableHead className="text-center">Resumo</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
+                                    <TableHead className="text-right">Agente</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={i}>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="space-y-2"><div className="h-4 w-32 bg-muted animate-pulse rounded" /><div className="h-3 w-20 bg-muted animate-pulse rounded" /></div></TableCell>
@@ -276,170 +477,43 @@ export function LeadsListView() {
                                         <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full" /></TableCell>
                                         <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
                                     </TableRow>
-                                ))
-                            ) : leads.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
-                                        Nenhum lead encontrado com os filtros atuais.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                leads.map((lead, idx) => {
-                                    const connected = isConnected(lead.contador_interacoes)
-                                    const leadName = getLeadName(lead)
-                                    const hasName = lead.first_name || lead.last_name
-
-                                    return (
-                                        <TableRow key={lead.id || idx} className="group">
-                                            <TableCell className="font-medium text-muted-foreground text-xs">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {formatDate(lead.created_at).split(' ')[0]}
-                                                    </div>
-                                                    <span className="opacity-70 pl-4.5">
-                                                        {formatDate(lead.created_at).split(' ')[1]}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic truncate max-w-[200px] block'}`}>
-                                                        {leadName}
-                                                    </span>
-                                                    {lead.company && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                                            <Briefcase className="h-3 w-3" />
-                                                            <span className="truncate max-w-[180px]">{lead.company}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-
-                                            <TableCell>
-                                                {lead.product ? (
-                                                    <div className="flex items-center gap-1.5 text-sm">
-                                                        <ShoppingBag className="h-3 w-3 text-muted-foreground" />
-                                                        <span className="truncate max-w-[150px]" title={lead.product}>
-                                                            {lead.product}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground italic">-</span>
-                                                )}
-                                            </TableCell>
-
-                                            {/* Resumo da Conversa (Botão) */}
-                                            <TableCell className="text-center">
-                                                <Dialog>
-                                                    <DialogTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 hover:opacity-100 transition-opacity">
-                                                            <FileText className={`h-4 w-4 ${lead.summary ? 'text-blue-500 fill-blue-500/10' : 'text-muted-foreground/30'}`} />
-                                                            <span className="sr-only">Ver Resumo</span>
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent>
-                                                        <DialogHeader>
-                                                            <DialogTitle>Resumo da Conversa</DialogTitle>
-                                                            <DialogDescription>
-                                                                Detalhes da interação com o lead.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <div className="mt-4 space-y-4">
-                                                            <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-md border">
-                                                                <div>
-                                                                    <span className="text-muted-foreground block text-xs mb-1">Lead</span>
-                                                                    <div className="font-medium flex items-center gap-2">
-                                                                        <User className="h-3 w-3 text-muted-foreground" />
-                                                                        {leadName}
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground block text-xs mb-1">Empresa</span>
-                                                                    <div className="font-medium flex items-center gap-2">
-                                                                        <Briefcase className="h-3 w-3 text-muted-foreground" />
-                                                                        {lead.company || '-'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="space-y-2">
-                                                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conteúdo da IA</label>
-                                                                <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto border text-foreground/90">
-                                                                    {lead.summary ? (
-                                                                        <p style={{ whiteSpace: 'pre-wrap' }}>{lead.summary}</p>
-                                                                    ) : (
-                                                                        <p className="text-muted-foreground italic">Nenhum resumo disponível para este lead.</p>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
-                                                                <div className="flex items-center gap-2">
-                                                                    <MessageSquare className="h-3 w-3" />
-                                                                    {lead.contador_interacoes} interações
-                                                                </div>
-                                                                <div>
-                                                                    ID: <span className="font-mono">{lead.id.substring(0, 8)}...</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            </TableCell>
-
-                                            <TableCell className="text-center">
-                                                {connected && (
-                                                    <Badge variant="success">
-                                                        Conectado
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2 text-sm">
-                                                    <span className="text-muted-foreground text-xs font-medium">{getAgentName(lead.agent_id)}</span>
-                                                    <div className="bg-muted p-1 rounded-full">
-                                                        <User className="h-3 w-3 opacity-50" />
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <DataTable columns={columns} data={leads} />
+                )
+            }
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-                <Pagination>
-                    <PaginationContent>
-                        <PaginationItem>
-                            <PaginationPrevious
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                        </PaginationItem>
+            {
+                totalPages > 1 && (
+                    <Pagination>
+                        <PaginationContent>
+                            <PaginationItem>
+                                <PaginationPrevious
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                />
+                            </PaginationItem>
 
-                        <div className="flex items-center gap-1 mx-4 text-sm font-medium">
-                            Página {currentPage} de {totalPages}
-                        </div>
+                            <div className="flex items-center gap-1 mx-4 text-sm font-medium">
+                                Página {currentPage} de {totalPages}
+                            </div>
 
-                        <PaginationItem>
-                            <PaginationNext
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                            />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
-            )}
-        </div>
+                            <PaginationItem>
+                                <PaginationNext
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                />
+                            </PaginationItem>
+                        </PaginationContent>
+                    </Pagination>
+                )
+            }
+        </div >
     )
 }
