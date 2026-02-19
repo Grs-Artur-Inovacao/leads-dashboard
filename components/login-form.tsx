@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,13 +14,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MicrosoftIcon } from "@/components/icons/microsoft-icon"
 import { signIn } from "next-auth/react"
+import { Loader2 } from "lucide-react"
 
 export function LoginForm({
     className,
     ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-    const handleMicrosoftLogin = () => {
-        signIn("azure-ad", { callbackUrl: "/" })
+    const [isLoading, setIsLoading] = React.useState<boolean>(false)
+
+    const handleMicrosoftLogin = async () => {
+        setIsLoading(true)
+        try {
+            await signIn("azure-ad", { callbackUrl: "/" })
+        } catch (error) {
+            console.error(error)
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -38,11 +48,17 @@ export function LoginForm({
                                 variant="outline"
                                 className="w-full flex items-center justify-center gap-2"
                                 onClick={handleMicrosoftLogin}
+                                disabled={isLoading}
                             >
-                                <MicrosoftIcon className="w-5 h-5" />
+                                {isLoading ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <MicrosoftIcon className="w-5 h-5" />
+                                )}
                                 Entrar com Microsoft
                             </Button>
                         </div>
+                        {/* 
                         <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
                             <span className="relative z-10 bg-background px-2 text-muted-foreground">
                                 Ou continue com
@@ -68,7 +84,8 @@ export function LoginForm({
                             <Button type="submit" className="w-full">
                                 Login
                             </Button>
-                        </form>
+                        </form> 
+                        */}
                     </div>
                 </CardContent>
             </Card>
