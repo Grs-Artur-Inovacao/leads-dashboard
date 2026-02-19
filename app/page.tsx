@@ -11,6 +11,8 @@ import { Sidebar } from "@/components/sidebar"
 import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
 import { HelpView } from "@/components/help-view"
+import { UpdatesView } from "@/components/updates-view"
+import { SmartInsightsView } from "@/components/smart-insights-view"
 
 export default function Home() {
     const [currentView, setCurrentView] = useState("dashboard")
@@ -34,6 +36,8 @@ export default function Home() {
 
                     {currentView === "dashboard" && <LeadsAreaChart />}
 
+                    {currentView === "insights" && <SmartInsightsView />}
+
                     {currentView === "leads" && <LeadsListView />}
 
                     {currentView === "reports" && (
@@ -42,13 +46,9 @@ export default function Home() {
                         </div>
                     )}
 
-                    {currentView === "analytics" && (
-                        <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
-                            Em breve: Analytics & Conversão
-                        </div>
-                    )}
-
                     {currentView === "settings" && <SettingsView />}
+
+                    {currentView === "updates" && <UpdatesView />}
 
                     {currentView === "help" && <HelpView />}
 

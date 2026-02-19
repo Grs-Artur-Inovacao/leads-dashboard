@@ -1,10 +1,4 @@
-# Central de Ajuda e Documentação
-
-Abaixo você encontrará o detalhamento completo do fluxo da nossa assistente virtual **Renatinha**, seguido pelas instruções de uso do Dashboard.
-
----
-
-## 1. Fluxo de Funcionamento (Renatinha)
+# Renatinha - Fluxo de Funcionamento
 
 A **Renatinha** é o coração da nossa automação de atendimento. O diagrama abaixo ilustra a jornada completa do lead, desde a captação via anúncios até o processamento inteligente de dados, integrações com CRM e regras de follow-up.
 
@@ -28,7 +22,6 @@ O "cérebro" da operação. A aplicação recebe a mensagem do usuário e proces
 ![Funções da Renatinha](/help-images/Step_2.png)
 
 #### Passo 2.1: Habilidades e Ferramentas (Skills)
-
 Para garantir a precisão das respostas, a Renatinha utiliza ferramentas de consulta a bases de dados:
 
 *   **Base de Dados Atual:** O sistema opera com um banco de dados do `supabase` estático contendo informações consolidadas de Janeiro.
@@ -62,30 +55,3 @@ Nenhum lead é deixado para trás. O sistema possui um ciclo de verificação au
 5.  **Resposta ao Salesforce**: Caso tenhamos todas as informações do cliente o sistema envia automaticamente o resumo da conversa e o status atualizado do lead para o CRM, garantindo que a equipe comercial tenha visibilidade total do histórico.
 
 ![Fluxo de Follow UP](/help-images/Step_4.png)
-
----
-
-## 2. Informações Adicionais: Painel Dashboard
-
-Após entender o fluxo da Renatinha, veja como acompanhar esses dados no nosso Dashboard.
-
-### Visão Geral
-A tela inicial apresenta um resumo estratégico:
--   **Gráfico de Área**: Exibe a evolução dos leads (Eixo X: Tempo, Eixo Y: Volume), permitindo filtrar por status ou operador.
--   **Dica**: Passe o mouse sobre os pontos do gráfico para métricas diárias detalhadas.
-
-### Leads Detalhados
-Na seção de lista, você tem controle total:
--   **Colunas**: Nome, Status (Novo, Em Atendimento, etc), Data da última interação e Agente responsável.
--   **Filtros**: Utilize os seletores no topo para segmentar a lista rapidamente.
-
-### Configurações
-Área administrativa para:
--   Atualizar perfil e senha.
--   Configurar notificações de alertas.
--   Gerenciar integrações (CRM, WhatsApp).
-
----
-
-**Suporte Técnico**
-Dúvidas sobre o funcionamento da Renatinha ou do Dashboard? Abra um chamado com a equipe de dev.

@@ -1,0 +1,12 @@
+[
+    {
+        "id": "renatinha",
+        "title": "Fluxo de Funcionamento (Renatinha)",
+        "file": "/docs/renatinha.md"
+    },
+    {
+        "id": "dashboard",
+        "title": "Manual do Dashboard",
+        "file": "/docs/dashboard.md"
+    }
+]
