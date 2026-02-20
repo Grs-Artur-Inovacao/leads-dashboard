@@ -91,8 +91,9 @@ export function KpiCard({
                     {/* Main Value */}
                     <div className="mt-2">
                         <span className="text-5xl font-extrabold tracking-tighter text-foreground">
-                            {value}
+                            {isPlaceholder ? "..." : value}
                         </span>
+
                     </div>
 
                     {/* Growth Indicator */}
@@ -115,8 +116,9 @@ export function KpiCard({
                         </p>
                         <div className="flex items-baseline gap-2">
                             <span className="text-xl font-bold text-foreground/90">
-                                {secondaryMetric.value}
+                                {isPlaceholder ? "..." : secondaryMetric.value}
                             </span>
+
                             {/* Alteração: Mostrar Meta direto, sem cálculo de % batida */}
                             {(secondaryMetric.goal !== undefined || isPlaceholder) && (
                                 <span className={cn(

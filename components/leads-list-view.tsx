@@ -29,12 +29,20 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+
+
+
+
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
 import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2 } from "lucide-react"
+
+
+import { LeadRegistrationForm } from "./lead-registration-form"
+
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, subDays } from "date-fns"
@@ -55,7 +63,14 @@ type Lead = {
     company?: string
     product?: string
     summary?: string
+    is_mql?: boolean
+    salesforce_id?: string
+    phone?: string
+    cnpj?: string
+    email?: string
 }
+
+
 
 export function LeadsListView() {
     // --- Estados de Controle ---
@@ -72,6 +87,8 @@ export function LeadsListView() {
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
 
     const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "cold">("all")
+
+
 
     // Paginação
     const [currentPage, setCurrentPage] = useState(1)
@@ -143,6 +160,10 @@ export function LeadsListView() {
             } else if (statusFilter === 'cold') {
                 query = query.lte('contador_interacoes', interactionThreshold)
             }
+
+
+
+
 
             // PAGINAÇÃO
             const from = (currentPage - 1) * pageSize
@@ -339,8 +360,11 @@ export function LeadsListView() {
                 )
             }
         },
+
+
         {
             accessorKey: "agent_id",
+
             header: () => <div className="text-right">Agente</div>,
             cell: ({ row }) => {
                 return (
@@ -370,6 +394,32 @@ export function LeadsListView() {
                     <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
+
+                    {/* Botão Novo MQL (Oculto para V1) */}
+                    {/* 
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="gap-2">
+                                <UserPlus className="h-4 w-4" />
+                                <span className="hidden sm:inline">Novo MQL</span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Cadastrar Novo MQL (Salesforce)</DialogTitle>
+                                <DialogDescription>
+                                    Preencha os dados abaixo para cadastrar diretamente no Salesforce.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <LeadRegistrationForm onSuccess={() => {
+                                fetchLeads()
+                            }} />
+                        </DialogContent>
+                    </Dialog>
+                    */}
+
+
 
 
                     <div className="flex items-center bg-muted/50 p-1 rounded-lg border">
@@ -441,6 +491,8 @@ export function LeadsListView() {
                     { id: 'all', label: 'Todos' },
                     { id: 'connected', label: 'Conectados' },
                     { id: 'cold', label: 'Frios' }
+
+
                 ].map(s => (
                     <button
                         key={s.id}
@@ -451,6 +503,7 @@ export function LeadsListView() {
                     </button>
                 ))}
             </div>
+
 
             {/* Table */}
             {
@@ -464,6 +517,8 @@ export function LeadsListView() {
                                     <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
                                     <TableHead className="text-center">Resumo</TableHead>
                                     <TableHead className="text-center">Status</TableHead>
+
+
                                     <TableHead className="text-right">Agente</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -474,7 +529,9 @@ export function LeadsListView() {
                                         <TableCell><div className="space-y-2"><div className="h-4 w-32 bg-muted animate-pulse rounded" /><div className="h-3 w-20 bg-muted animate-pulse rounded" /></div></TableCell>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-4 w-8 mx-auto bg-muted animate-pulse rounded" /></TableCell>
-                                        <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full" /></TableCell>
+                                        <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full mx-auto" /></TableCell>
+
+
                                         <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
                                     </TableRow>
                                 ))}

@@ -223,47 +223,7 @@ export function SettingsView() {
                 {/* Column 2: Future & System Parameters */}
                 <div className="space-y-6">
 
-                    {/* Future Features (Places First) */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between px-1">
-                            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Em breve</h3>
-                        </div>
 
-                        {/* KPI Launch Alert */}
-                        <Card className="shadow-sm border border-primary/20 bg-primary/5">
-                            <CardHeader className="pb-2 pt-4">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="flex items-center gap-2 text-sm text-primary">
-                                        <BarChart3 className="h-4 w-4" />
-                                        Novo Motor de KPIs
-                                    </CardTitle>
-                                    <Badge className="text-[9px] h-4 bg-primary text-primary-foreground">Novo</Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                    Estamos lançando o novo motor de métricas. As metas definidas aqui calibrarão automaticamente os relatórios da aba Analytics.
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="shadow-sm border-dashed border-muted bg-muted/20 opacity-75 hover:opacity-100 transition-opacity">
-                            <CardHeader className="pb-2 pt-4">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Share2 className="h-4 w-4" />
-                                        Integrações
-                                    </CardTitle>
-                                    <Badge variant="outline" className="text-[9px] h-4">Abril</Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-[10px] text-muted-foreground/80">
-                                    Conexão nativa com Salesforce.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
 
                     <Card className="shadow-sm border-muted h-fit">
                         <CardHeader>

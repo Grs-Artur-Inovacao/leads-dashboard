@@ -118,14 +118,18 @@ export function LeadsAreaChart() {
     const [kpis, setKpis] = useState({
         totalLeads: 0,
         connectedLeads: 0,
+        mqlLeads: 0,
         avgConnectivity: 0
     })
+
 
     const [previousKpis, setPreviousKpis] = useState({
         totalLeads: 0,
         connectedLeads: 0,
+        mqlLeads: 0,
         avgConnectivity: 0
     })
+
 
     // Função para calcular meta proporcional ao período selecionado
     const calculateProportionalTarget = (monthlyTarget: number, dateRange: DateRange | undefined) => {
@@ -203,7 +207,8 @@ export function LeadsAreaChart() {
             // Query Atual
             let query = supabase
                 .from('info_lead')
-                .select('created_at, agent_id, contador_interacoes')
+                .select('created_at, agent_id, contador_interacoes, is_mql')
+
                 .order('created_at', { ascending: true })
                 .gte('created_at', fromDate.toISOString())
                 .lte('created_at', queryEndDate.toISOString())
@@ -211,7 +216,8 @@ export function LeadsAreaChart() {
             // Query Anterior
             let previousQuery = supabase
                 .from('info_lead')
-                .select('created_at, agent_id, contador_interacoes')
+                .select('created_at, agent_id, contador_interacoes, is_mql')
+
                 .gte('created_at', previousFromDate.toISOString())
                 .lte('created_at', previousToDate.toISOString())
 
@@ -221,8 +227,8 @@ export function LeadsAreaChart() {
                 previousQuery = previousQuery.in('agent_id', selectedAgents)
             } else {
                 setChartData([])
-                setKpis({ totalLeads: 0, connectedLeads: 0, avgConnectivity: 0 })
-                setPreviousKpis({ totalLeads: 0, connectedLeads: 0, avgConnectivity: 0 })
+                setKpis({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 })
+                setPreviousKpis({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 })
                 setLoading(false)
                 return
             }
@@ -241,23 +247,31 @@ export function LeadsAreaChart() {
             // --- Processamento Período Anterior ---
             let prevTotal = 0
             let prevConnected = 0
+            let prevMql = 0
+
 
             previousData?.forEach((lead: any) => {
                 const isConnected = (lead.contador_interacoes || 0) > interactionThreshold
                 prevTotal++
                 if (isConnected) prevConnected++
+                if (lead.is_mql) prevMql++
             })
+
 
             setPreviousKpis({
                 totalLeads: prevTotal,
                 connectedLeads: prevConnected,
+                mqlLeads: prevMql,
                 avgConnectivity: prevTotal > 0 ? (prevConnected / prevTotal) * 100 : 0
             })
+
 
             // --- Processamento ---
             let totalLeadsCount = 0
             let connectedLeadsCount = 0
+            let mqlLeadsCount = 0
             const leadsByDate = new Map<string, any>()
+
 
             // 1. Inicializar todas as datas do intervalo
             let fillStart = new Date(fromDate)
@@ -298,6 +312,8 @@ export function LeadsAreaChart() {
 
                 totalLeadsCount++
                 if (isConnected) connectedLeadsCount++
+                if (lead.is_mql) mqlLeadsCount++
+
 
                 if (selectedAgents.includes(agent)) {
                     // Contagem Total por Agente
@@ -325,8 +341,10 @@ export function LeadsAreaChart() {
             setKpis({
                 totalLeads: totalLeadsCount,
                 connectedLeads: connectedLeadsCount,
+                mqlLeads: mqlLeadsCount,
                 avgConnectivity: totalLeadsCount > 0 ? (connectedLeadsCount / totalLeadsCount) * 100 : 0
             })
+
             setLoading(false)
 
         } catch (err) {
@@ -440,18 +458,20 @@ export function LeadsAreaChart() {
                 />
                 <KpiCard
                     title="Leads MQL"
-                    value="..."
-                    goal={0}
-                    currentValue={0}
-                    previousValue={0}
-                    description="Leads qualificados pelo time de pré-vendas."
-                    isPlaceholder={true}
+                    value={kpis.mqlLeads}
+                    goal={calculateProportionalTarget(mqlTarget, date)}
+                    currentValue={kpis.mqlLeads}
+                    previousValue={previousKpis.mqlLeads}
+                    description="Leads qualificados pelo time de pré-vendas e enviados ao CRM."
                     secondaryMetric={{
                         label: "Conversão (Conectado → MQL)",
-                        value: "...",
+                        value: kpis.connectedLeads > 0 ? `${((kpis.mqlLeads / kpis.connectedLeads) * 100).toFixed(1)}%` : "0%",
                         goal: mqlTarget
                     }}
+                    isPlaceholder={true}
                 />
+
+
             </div>
 
             {/* Chart */}

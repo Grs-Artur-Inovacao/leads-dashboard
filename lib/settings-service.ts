@@ -25,9 +25,12 @@ export const settingsService = {
     async getSettings(): Promise<DashboardSettings> {
         try {
             const { data, error } = await supabase
-                .from('dashboard_settings')
+                .schema('dashboard_config')
+                .from('settings')
                 .select('*')
                 .single()
+
+
 
             if (error) {
                 console.warn("Using default settings (DB fetch failed):", error.message)
@@ -47,8 +50,11 @@ export const settingsService = {
 
         // Upsert to row with ID 1
         const { error } = await supabase
-            .from('dashboard_settings')
+            .schema('dashboard_config')
+            .from('settings')
             .upsert({ id: 1, ...payload })
+
+
 
         if (error) throw error
     },
@@ -56,7 +62,9 @@ export const settingsService = {
     subscribeToSettings(callback: (settings: DashboardSettings) => void) {
         return supabase
             .channel('dashboard-settings-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_settings' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'dashboard_config', table: 'settings' }, (payload) => {
+
+
                 if (payload.new) {
                     callback(payload.new as DashboardSettings)
                 }

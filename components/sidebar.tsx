@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Sparkles, LogOut, ChevronsUpDown } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Bell, LogOut, ChevronsUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSession, signOut } from "next-auth/react"
@@ -27,13 +27,15 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
 
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+        // { id: "insights", label: "Analytics", icon: BarChart3 },
         { id: "leads", label: "Leads Detalhados", icon: Users },
-        { id: "reports", label: "Relatórios", icon: FileText },
-        { id: "insights", label: "Analytics", icon: BarChart3 },
+        // { id: "reports", label: "Relatórios", icon: FileText },
     ]
 
+
+
     const bottomItems = [
-        { id: "updates", label: "Novidades", icon: Sparkles },
+        { id: "updates", label: "Novidades", icon: Bell },
         { id: "settings", label: "Configurações", icon: Settings },
         { id: "help", label: "Ajuda", icon: HelpCircle },
     ]

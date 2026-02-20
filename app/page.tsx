@@ -13,10 +13,13 @@ import { SettingsView } from "@/components/settings-view"
 import { HelpView } from "@/components/help-view"
 import { UpdatesView } from "@/components/updates-view"
 import { SmartInsightsView } from "@/components/smart-insights-view"
-import { Zap } from "lucide-react"
+
+
 
 export default function Home() {
     const [currentView, setCurrentView] = useState("dashboard")
+
+
     const [isCollapsed, setIsCollapsed] = useState(false)
 
     return (
@@ -34,17 +37,7 @@ export default function Home() {
             {/* Conteúdo Principal */}
             <main className="flex-1 w-full transition-all duration-300">
                 <div className="container mx-auto p-6 md:p-8 max-w-[1600px] space-y-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg">
-                                <Zap className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-foreground">Leads Dashboard</h1>
-                                <p className="text-xs text-muted-foreground font-medium">Gestão e Monitoramento de Performance em Tempo Real</p>
-                            </div>
-                        </div>
-                    </div>
+
 
                     {currentView === "dashboard" && <LeadsAreaChart />}
 
