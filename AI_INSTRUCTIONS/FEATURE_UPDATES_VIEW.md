@@ -12,36 +12,37 @@ A seção "Novidades" (Updates View) é responsável por exibir o histórico de 
     *   Implementação baseada na biblioteca `vaul` para exibir o conteúdo detalhado em um painel deslizante.
 
 ### Fontes de Dados
-*   **Manifesto**: `public/updates/manifest.json`
-    *   Arquivo JSON que atua como índice das atualizações.
-    *   Contém metadados: `id`, `version`, `date`, `title`, `summary`, `file` (caminho para o markdown).
-*   **Conteúdo Detalhado**: `public/updates/*.md`
-    *   Arquivos Markdown individuais contendo o texto completo de cada atualização.
+*   **Tabela Supabase**: `dashboard_config.updates_feed`
+    *   Campos: `id`, `version`, `date_display`, `title`, `summary`, `content`, `release_date`, `is_active`, `theme_color`.
+*   **Personalização Visual**:
+    *   A coluna `theme_color` permite escolher a cor de destaque do card.
+    *   Valores suportados: `blue` (default), `orange`, `green`, `purple`.
 
 ## 3. Workflow para Adicionar Novas Atualizações
 
-Para adicionar uma nova atualização ao sistema, siga estes passos:
+As atualizações agora são gerenciadas via Banco de Dados (Supabase). Para adicionar uma nova:
 
-1.  **Criar o Arquivo de Conteúdo**:
-    *   Crie um novo arquivo `.md` na pasta `public/updates/` (ex: `v2.1.0.md`).
-    *   Escreva o conteúdo detalhado usando Markdown padrão.
-
-2.  **Atualizar o Manifesto**:
-    *   Edite `public/updates/manifest.json`.
-    *   Adicione um novo objeto ao array (preferencialmente no início para ordem cronológica inversa):
-    ```json
-    {
-      "id": "v2.1.0",
-      "version": "v2.1.0",
-      "date": "Março 2026",
-      "title": "Título da Atualização",
-      "summary": "Resumo curto que aparece no card.",
-      "file": "/updates/v2.1.0.md"
-    }
+1.  **Inserir Registro na Tabela**:
+    ```sql
+    INSERT INTO dashboard_config.updates_feed (
+      version, 
+      title, 
+      summary, 
+      content, 
+      theme_color, 
+      is_active
+    ) VALUES (
+      '2.2.0', 
+      'Nova Funcionalidade', 
+      'Breve resumo para o card.', 
+      'Texto completo em **Markdown** para o detalhamento...', 
+      'orange', 
+      true
+    );
     ```
 
-3.  **Deploy**:
-    *   O sistema irá ler automaticamente o novo arquivo JSON e exibir o card.
+2.  **Verificação**:
+    *   O dashboard carrega automaticamente os registros onde `is_active = true`, ordenados pela `release_date` decrescente.
 
 ## 4. Diretrizes de Estilo e UI
 

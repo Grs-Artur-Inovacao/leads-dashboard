@@ -18,6 +18,7 @@ import {
     DrawerTitle,
 } from "@/components/ui/drawer"
 import { supabase } from "@/lib/supabaseClient"
+import { cn } from "@/lib/utils"
 
 interface UpdateItem {
     id: string
@@ -27,12 +28,49 @@ interface UpdateItem {
     summary: string
     content: string
     release_date: string
+    theme_color?: string // New field for customization
 }
 
 export function UpdatesView() {
     const [updates, setUpdates] = useState<UpdateItem[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedUpdate, setSelectedUpdate] = useState<UpdateItem | null>(null)
+
+    // Helper to get color classes based on theme_color
+    const getColorClasses = (color?: string) => {
+        switch (color?.toLowerCase()) {
+            case 'orange':
+                return {
+                    overlay: 'bg-orange-500/20',
+                    badge: 'bg-orange-500/20 text-orange-500 hover:bg-orange-500/30',
+                    glow: 'shadow-orange-500/10'
+                }
+            case 'blue':
+                return {
+                    overlay: 'bg-blue-500/20',
+                    badge: 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30',
+                    glow: 'shadow-blue-500/10'
+                }
+            case 'green':
+                return {
+                    overlay: 'bg-green-500/20',
+                    badge: 'bg-green-500/20 text-green-500 hover:bg-green-500/30',
+                    glow: 'shadow-green-500/10'
+                }
+            case 'purple':
+                return {
+                    overlay: 'bg-purple-500/20',
+                    badge: 'bg-purple-500/20 text-purple-500 hover:bg-purple-500/30',
+                    glow: 'shadow-purple-500/10'
+                }
+            default:
+                return {
+                    overlay: 'bg-primary/20',
+                    badge: 'bg-primary/20 text-primary hover:bg-primary/30',
+                    glow: 'shadow-primary/10'
+                }
+        }
+    }
 
     useEffect(() => {
         async function loadUpdates() {
@@ -43,8 +81,6 @@ export function UpdatesView() {
                     .select('*')
                     .eq('is_active', true)
                     .order('release_date', { ascending: false })
-
-
 
                 if (error) throw error
 
@@ -91,46 +127,53 @@ export function UpdatesView() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {updates.map((update, index) => (
-                    <motion.div
-                        key={update.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                        <Card className="relative mx-auto w-full overflow-hidden pt-0 shadow-lg border-muted/20">
-                            <div className="absolute inset-0 z-30 h-[200px] bg-black/40" />
-                            <img
-                                src={`https://avatar.vercel.sh/${update.version}?size=400&text=${update.version}`}
-                                alt={`Version ${update.version}`}
-                                className="relative z-20 h-[200px] w-full object-cover brightness-75 grayscale transition-all duration-500 hover:grayscale-0 hover:brightness-100 dark:brightness-50"
-                            />
-                            <CardHeader className="flex-1">
-                                <CardAction>
-                                    <Badge variant="secondary" className="font-mono bg-primary/20 text-primary hover:bg-primary/30">
-                                        {update.version}
-                                    </Badge>
-                                    <span className="ml-auto text-xs text-muted-foreground">{update.date_display || update.release_date}</span>
-                                </CardAction>
-                                <CardTitle className="text-xl">{update.title}</CardTitle>
-                                <div className="text-sm text-muted-foreground line-clamp-3 mt-2 prose-sm prose-stone dark:prose-invert">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {formatMarkdown(update.summary)}
-                                    </ReactMarkdown>
-                                </div>
-                            </CardHeader>
-                            <CardFooter>
-                                <Button
-                                    className="w-full"
-                                    variant="secondary"
-                                    onClick={() => setSelectedUpdate(update)}
-                                >
-                                    Ver Detalhes
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    </motion.div>
-                ))}
+                {updates.map((update, index) => {
+                    const colors = getColorClasses(update.theme_color)
+                    return (
+                        <motion.div
+                            key={update.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.1 }}
+                        >
+                            <Card className={cn(
+                                "relative mx-auto w-full overflow-hidden pt-0 shadow-lg transition-all duration-300",
+                                colors.glow
+                            )}>
+                                <div className={cn("absolute inset-0 z-30 h-[200px]", colors.overlay)} />
+                                <div className="absolute inset-0 z-30 h-[200px] bg-black/40" />
+                                <img
+                                    src={`https://avatar.vercel.sh/${update.version}?size=400&text=${update.version}`}
+                                    alt={`Version ${update.version}`}
+                                    className="relative z-20 h-[200px] w-full object-cover brightness-75 grayscale transition-all duration-500 hover:grayscale-0 hover:brightness-100 dark:brightness-50"
+                                />
+                                <CardHeader className="flex-1">
+                                    <CardAction>
+                                        <Badge variant="secondary" className={cn("font-mono", colors.badge)}>
+                                            {update.version}
+                                        </Badge>
+                                        <span className="ml-auto text-xs text-muted-foreground">{update.date_display || update.release_date}</span>
+                                    </CardAction>
+                                    <CardTitle className="text-xl">{update.title}</CardTitle>
+                                    <div className="text-sm text-muted-foreground line-clamp-3 mt-2 prose-sm prose-stone dark:prose-invert">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {formatMarkdown(update.summary)}
+                                        </ReactMarkdown>
+                                    </div>
+                                </CardHeader>
+                                <CardFooter>
+                                    <Button
+                                        className="w-full"
+                                        variant="secondary"
+                                        onClick={() => setSelectedUpdate(update)}
+                                    >
+                                        Ver Detalhes
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        </motion.div>
+                    )
+                })}
             </div>
 
             <Drawer open={!!selectedUpdate} onOpenChange={(open) => !open && setSelectedUpdate(null)}>

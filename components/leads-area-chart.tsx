@@ -33,6 +33,31 @@ import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
 import { settingsService } from "@/lib/settings-service"
+import {
+    PieChart,
+    Pie,
+    Cell,
+    Legend,
+    BarChart,
+    Bar,
+    ResponsiveContainer,
+    Tooltip as RechartsTooltip
+} from "recharts"
+import { PieChart as PieChartIcon, Search, RefreshCw, BarChart3, Target } from "lucide-react"
+
+// --- Tipos ---
+interface CampaignLog {
+    id: string
+    created_at: string
+    phone: string
+    utm_campaign?: string
+    camping?: string
+    campaign_name?: string
+    "camping name"?: string
+    display_campaign?: string
+}
+
+const COLORS = ['#3b82f6', '#ffffff']
 
 // --- Configurações Visuais ---
 
@@ -70,6 +95,8 @@ export function LeadsAreaChart() {
     const [mqlTarget, setMqlTarget] = useState(10) // Novo estado para Meta MQL
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
     const [isLoaded, setIsLoaded] = useState(false)
+    const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([])
+    const [campaignLoading, setCampaignLoading] = useState(false)
 
 
     // --- Efeito: Carregar Configurações e Ouvir Mudanças ---
@@ -159,6 +186,76 @@ export function LeadsAreaChart() {
         })
         return config
     }, [selectedAgents, agentNames])
+
+    // --- Auxiliar de Campanhas ---
+    const extractCampaignName = (campaign: string | undefined): string => {
+        if (!campaign || campaign.trim() === "") return "Direto / Orgânico"
+
+        const matches = campaign.match(/\[([^\]]+)\]/g)
+        if (matches && matches.length >= 7) {
+            return matches[6].replace(/[\[\]]/g, '').replace(/\+/g, ' ')
+        }
+
+        if (campaign.startsWith('[') && matches && matches.length > 0) {
+            return matches[matches.length - 1].replace(/[\[\]]/g, '').replace(/\+/g, ' ')
+        }
+
+        return campaign.replace(/\+/g, ' ')
+    }
+
+    const fetchCampaignLogs = async () => {
+        setCampaignLoading(true)
+        try {
+            const fromDate = date?.from || subDays(new Date(), 7)
+            const toDate = date?.to || new Date()
+            const queryEndDate = new Date(toDate)
+            queryEndDate.setHours(23, 59, 59, 999)
+
+            const { data, error } = await supabase
+                .from('campaign_log')
+                .select('*')
+                .gte('created_at', fromDate.toISOString())
+                .lte('created_at', queryEndDate.toISOString())
+                .order('created_at', { ascending: false })
+                .limit(1000)
+
+            if (error) throw error
+
+            const enrichedLogs = data.map(log => {
+                const campaignValue =
+                    log.utm_campaign ||
+                    log.camping ||
+                    log.campaign_name ||
+                    log["camping name"] ||
+                    ""
+
+                return {
+                    ...log,
+                    display_campaign: extractCampaignName(campaignValue)
+                }
+            })
+
+            setCampaignLogs(enrichedLogs)
+        } catch (error) {
+            console.error("Erro ao buscar logs de campanha:", error)
+        } finally {
+            setCampaignLoading(false)
+        }
+    }
+
+    const campaignChartData = useMemo(() => {
+        const counts: Record<string, number> = {}
+        campaignLogs.forEach(log => {
+            if (log.display_campaign) {
+                counts[log.display_campaign] = (counts[log.display_campaign] || 0) + 1
+            }
+        })
+
+        return Object.entries(counts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 8)
+    }, [campaignLogs])
 
     // --- Efeito: Buscar Lista de Agentes ---
     useEffect(() => {
@@ -355,6 +452,7 @@ export function LeadsAreaChart() {
     useEffect(() => {
         if (selectedAgents.length > 0 || availableAgents.length > 0) {
             fetchLeadsData()
+            fetchCampaignLogs()
         }
     }, [date, selectedAgents, metricType, interactionThreshold])
 
@@ -468,133 +566,197 @@ export function LeadsAreaChart() {
                     }}
                     isPlaceholder={true}
                 />
-
-
             </div>
 
-            {/* Chart */}
-            <Card>
-                <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-                    <div className="grid flex-1 gap-1 text-center sm:text-left">
-                        <CardTitle>Evolução Temporal</CardTitle>
-                        <CardDescription>
-                            {metricType === 'comparison'
-                                ? "Comparativo: Total vs Conectados"
-                                : `Comparando performance (${metricType === 'total' ? 'Total' : 'Conectados'})`
-                            }
-                        </CardDescription>
-                    </div>
-                    {/* Seletor de Métrica do Gráfico */}
-                    <div className="flex items-center gap-2 rounded-md border p-1 bg-muted/50">
-                        <button
-                            onClick={() => setMetricType("total")}
-                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'total' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                {/* Gráfico Principal */}
+                <Card className="xl:col-span-2">
+                    <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+                        <div className="grid flex-1 gap-1 text-center sm:text-left">
+                            <CardTitle>Evolução Temporal</CardTitle>
+                            <CardDescription>
+                                {metricType === 'comparison'
+                                    ? "Comparativo: Total vs Conectados"
+                                    : `Comparando performance (${metricType === 'total' ? 'Total' : 'Conectados'})`
+                                }
+                            </CardDescription>
+                        </div>
+                        {/* Seletor de Métrica do Gráfico */}
+                        <div className="flex items-center gap-2 rounded-md border p-1 bg-muted/50">
+                            <button
+                                onClick={() => setMetricType("total")}
+                                className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'total' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+                            >
+                                Total Leads
+                            </button>
+                            <button
+                                onClick={() => setMetricType("connected")}
+                                className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'connected' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+                            >
+                                Conectados
+                            </button>
+                            <button
+                                onClick={() => setMetricType("comparison")}
+                                className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'comparison' ? 'bg-background shadow-sm text-foreground font-medium text-blue-500' : 'text-muted-foreground hover:bg-background/50'}`}
+                            >
+                                Comparativo VS
+                            </button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+                        <ChartContainer
+                            config={chartConfig}
+                            className="aspect-auto h-[300px] w-full"
                         >
-                            Total Leads
-                        </button>
-                        <button
-                            onClick={() => setMetricType("connected")}
-                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'connected' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
-                        >
-                            Conectados
-                        </button>
-                        <button
-                            onClick={() => setMetricType("comparison")}
-                            className={`px-3 py-1 text-xs rounded-sm transition-colors ${metricType === 'comparison' ? 'bg-background shadow-sm text-foreground font-medium text-blue-500' : 'text-muted-foreground hover:bg-background/50'}`}
-                        >
-                            Comparativo VS
-                        </button>
-                    </div>
-                </CardHeader>
-                <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-                    <ChartContainer
-                        config={chartConfig}
-                        className="aspect-auto h-[350px] w-full"
-                    >
-                        <AreaChart data={chartData}>
-                            <defs>
-                                <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
-                                </linearGradient>
-                                <linearGradient id="fillConnected" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
-                                </linearGradient>
-                                {selectedAgents.map((agent: string, index: number) => (
-                                    <linearGradient key={agent} id={`fill${agent}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop
-                                            offset="5%"
-                                            stopColor={chartConfig[agent]?.color}
-                                            stopOpacity={0.8}
-                                        />
-                                        <stop
-                                            offset="95%"
-                                            stopColor={chartConfig[agent]?.color}
-                                            stopOpacity={0.1}
-                                        />
+                            <AreaChart data={chartData}>
+                                <defs>
+                                    <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
                                     </linearGradient>
-                                ))}
-                            </defs>
-                            <CartesianGrid vertical={true} strokeDasharray="3 3" strokeOpacity={0.15} />
-                            <XAxis
-                                dataKey="date"
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                minTickGap={32}
-                            />
-                            <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={8}
-                                width={30}
-                            />
-                            <ChartTooltip
-                                cursor={false}
-                                content={<ChartTooltipContent indicator="dot" />}
-                            />
+                                    <linearGradient id="fillConnected" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
+                                    </linearGradient>
+                                    {selectedAgents.map((agent: string) => (
+                                        <linearGradient key={agent} id={`fill${agent}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop
+                                                offset="5%"
+                                                stopColor={chartConfig[agent]?.color}
+                                                stopOpacity={0.8}
+                                            />
+                                            <stop
+                                                offset="95%"
+                                                stopColor={chartConfig[agent]?.color}
+                                                stopOpacity={0.1}
+                                            />
+                                        </linearGradient>
+                                    ))}
+                                </defs>
+                                <CartesianGrid vertical={true} strokeDasharray="3 3" strokeOpacity={0.15} />
+                                <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    minTickGap={32}
+                                />
+                                <YAxis
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    width={30}
+                                />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent indicator="dot" />}
+                                />
 
-                            {metricType === 'comparison' ? (
-                                <>
-                                    <Area
-                                        dataKey="total"
-                                        name="Total"
-                                        type="monotone"
-                                        fill="url(#fillTotal)"
-                                        stroke="#3b82f6"
-                                        fillOpacity={1}
-                                        strokeWidth={2}
+                                {metricType === 'comparison' ? (
+                                    <>
+                                        <Area
+                                            dataKey="total"
+                                            name="Total"
+                                            type="monotone"
+                                            fill="url(#fillTotal)"
+                                            stroke="#3b82f6"
+                                            fillOpacity={1}
+                                            strokeWidth={2}
+                                        />
+                                        <Area
+                                            dataKey="connected"
+                                            name="Conectados"
+                                            type="monotone"
+                                            fill="url(#fillConnected)"
+                                            stroke="#10b981"
+                                            fillOpacity={1}
+                                            strokeWidth={2}
+                                        />
+                                    </>
+                                ) : (
+                                    selectedAgents.map((agent: string) => (
+                                        <Area
+                                            key={agent}
+                                            dataKey={metricType === 'connected' ? `${agent}_connected` : agent}
+                                            name={(chartConfig[agent]?.label as string) || agent}
+                                            type="monotone"
+                                            fill={`url(#fill${agent})`}
+                                            stroke={chartConfig[agent]?.color}
+                                            fillOpacity={0.4}
+                                            strokeWidth={2}
+                                        />
+                                    ))
+                                )}
+                                <ChartLegend content={<ChartLegendContent />} />
+                            </AreaChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+
+                {/* Pie Chart de Campanhas */}
+                <Card className="bg-card border-zinc-800 shadow-xl overflow-hidden flex flex-col xl:col-span-1">
+                    <CardHeader className="pb-4 pt-6 px-6 border-b">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-primary" />
+                                <CardTitle className="text-lg font-bold">Intermediação Ads → Wpp</CardTitle>
+                            </div>
+                            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold border border-primary/20">
+                                RENATA V2
+                            </span>
+                        </div>
+                        <CardDescription className="text-xs">Leads que enviaram o telefone na página de captura (Ponte).</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 pb-4 flex flex-col justify-center min-h-[300px]">
+                        {campaignLoading ? (
+                            <div className="h-full flex items-center justify-center">
+                                <RefreshCw className="h-8 w-8 text-zinc-800 animate-spin" />
+                            </div>
+                        ) : campaignChartData.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
+                                Nenhum dado encontrado.
+                            </div>
+                        ) : (
+                            <ChartContainer
+                                config={{
+                                    value: { label: "Cliques" },
+                                    ...Object.fromEntries(campaignChartData.map((d, i) => [d.name, { label: d.name, color: COLORS[i % COLORS.length] }]))
+                                }}
+                                className="[&_.recharts-pie-label-text]:fill-foreground mx-auto aspect-square w-full max-h-[250px]"
+                            >
+                                <PieChart>
+                                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                                    <Pie
+                                        data={campaignChartData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        label={({ name, value }) => `${value}`}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={50}
+                                        outerRadius={70}
+                                        paddingAngle={5}
+                                    >
+                                        {campaignChartData.map((entry, index) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={COLORS[index % COLORS.length]}
+                                                stroke="rgba(0,0,0,0.2)"
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        height={36}
+                                        formatter={(value) => <span className="text-[10px] text-zinc-400 font-medium">{value}</span>}
                                     />
-                                    <Area
-                                        dataKey="connected"
-                                        name="Conectados"
-                                        type="monotone"
-                                        fill="url(#fillConnected)"
-                                        stroke="#10b981"
-                                        fillOpacity={1}
-                                        strokeWidth={2}
-                                    />
-                                </>
-                            ) : (
-                                selectedAgents.map((agent: string, index: number) => (
-                                    <Area
-                                        key={agent}
-                                        dataKey={metricType === 'connected' ? `${agent}_connected` : agent}
-                                        name={(chartConfig[agent]?.label as string) || agent}
-                                        type="monotone"
-                                        fill={`url(#fill${agent})`}
-                                        stroke={chartConfig[agent]?.color}
-                                        fillOpacity={0.4}
-                                        strokeWidth={2}
-                                    />
-                                ))
-                            )}
-                            <ChartLegend content={<ChartLegendContent />} />
-                        </AreaChart>
-                    </ChartContainer>
-                </CardContent>
-            </Card>
+                                </PieChart>
+                            </ChartContainer>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     )
 }
