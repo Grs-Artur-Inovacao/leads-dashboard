@@ -38,7 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2 } from "lucide-react"
+import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2, BadgeCheck, Globe, Target, Layers, Megaphone } from "lucide-react"
 
 
 import { LeadRegistrationForm } from "./lead-registration-form"
@@ -68,6 +68,27 @@ type Lead = {
     phone?: string
     cnpj?: string
     email?: string
+    extracted_campaign?: string
+    utm_source?: string
+    utm_medium?: string
+    utm_content?: string
+}
+
+// Helper to extract campaign name (copied from CampaignLogsView for consistency)
+const extractCampaignName = (campaign: string | undefined): string => {
+    if (!campaign || campaign.trim() === "") return "Direto / Orgânico"
+
+    // Match contents inside brackets [ATR][MT]...[Campaign Name][NT]
+    const matches = campaign.match(/\[([^\]]+)\]/g)
+    if (matches && matches.length >= 7) {
+        return matches[6].replace(/[\[\]]/g, '').replace(/\+/g, ' ')
+    }
+
+    if (campaign.startsWith('[') && matches && matches.length > 0) {
+        return matches[matches.length - 1].replace(/[\[\]]/g, '').replace(/\+/g, ' ')
+    }
+
+    return campaign.replace(/\+/g, ' ')
 }
 
 
@@ -174,7 +195,61 @@ export function LeadsListView() {
 
             if (error) throw error
 
-            setLeads(data || [])
+            const leadData = data || []
+
+            // --- Enrichment with Campaign Data ---
+            const enrichedLeads = [...leadData]
+            try {
+                const phones = Array.from(new Set(leadData.map(l => l.phone).filter(Boolean)))
+                if (phones.length > 0) {
+                    // Fetch latest campaign log for each phone
+                    // Selecting more columns to catch potential campaign name fields
+                    const { data: campaignData, error: campaignError } = await supabase
+                        .from('campaign_log')
+                        .select('*')
+                        .or(phones.map(p => `phone.ilike.%${p}%`).join(','))
+                        .order('created_at', { ascending: false })
+
+                    if (!campaignError && campaignData) {
+                        const campaignMap = new Map()
+                        campaignData.forEach(log => {
+                            const normalized = log.phone?.replace(/\D/g, '')
+                            // Only keep the most recent one (since it's ordered by created_at desc)
+                            if (normalized && !campaignMap.has(normalized)) {
+                                // Try all variations of campaign field names
+                                const campaignValue =
+                                    (log as any).utm_campaign ||
+                                    (log as any).camping ||
+                                    (log as any).campaign_name ||
+                                    (log as any)["camping name"] ||
+                                    "";
+
+                                campaignMap.set(normalized, {
+                                    name: extractCampaignName(campaignValue),
+                                    source: (log as any).utm_source,
+                                    medium: (log as any).utm_medium,
+                                    content: (log as any).utm_content
+                                })
+                            }
+                        })
+
+                        enrichedLeads.forEach(lead => {
+                            const normalized = lead.phone?.replace(/\D/g, '')
+                            if (normalized && campaignMap.has(normalized)) {
+                                const details = campaignMap.get(normalized)
+                                lead.extracted_campaign = details.name
+                                lead.utm_source = details.source
+                                lead.utm_medium = details.medium
+                                lead.utm_content = details.content
+                            }
+                        })
+                    }
+                }
+            } catch (enrichError) {
+                console.error("Erro ao enriquecer leads com campanhas:", enrichError)
+            }
+
+            setLeads(enrichedLeads)
             setCount(count || 0)
 
         } catch (error) {
@@ -245,10 +320,13 @@ export function LeadsListView() {
                 const leadName = getLeadName(lead)
                 const hasName = lead.first_name || lead.last_name
                 return (
-                    <div className="flex flex-col">
-                        <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic truncate max-w-[200px] block'}`}>
-                            {leadName}
-                        </span>
+                    <div className="flex flex-col group relative">
+                        <div className="flex items-center gap-2">
+                            <span className={`font-medium ${hasName ? 'text-foreground' : 'text-muted-foreground italic truncate max-w-[200px] block'}`}>
+                                {leadName}
+                            </span>
+
+                        </div>
                         {lead.company && (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                                 <Briefcase className="h-3 w-3" />
@@ -264,15 +342,61 @@ export function LeadsListView() {
             header: "Interesse (Produto)",
             cell: ({ row }) => {
                 const product = row.getValue("product") as string
-                return product ? (
-                    <div className="flex items-center gap-1.5 text-sm">
-                        <ShoppingBag className="h-3 w-3 text-muted-foreground" />
-                        <span className="truncate max-w-[150px]" title={product}>
-                            {product}
-                        </span>
+                const campaign = row.original.extracted_campaign
+
+                return (
+                    <div className="flex flex-col gap-1.5 text-sm">
+                        {product ? (
+                            <div className="flex items-center gap-1.5">
+                                <ShoppingBag className="h-3 w-3 text-muted-foreground" />
+                                <span className="truncate max-w-[150px]" title={product}>
+                                    {product}
+                                </span>
+                            </div>
+                        ) : (
+                            <span className="text-xs text-muted-foreground italic">-</span>
+                        )}
                     </div>
-                ) : (
-                    <span className="text-xs text-muted-foreground italic">-</span>
+                )
+            }
+        },
+        {
+            id: "campaign_details",
+            header: "Origem & Campanha",
+            cell: ({ row }) => {
+                const lead = row.original
+                if (!lead.extracted_campaign && !lead.utm_source) {
+                    return <span className="text-xs text-muted-foreground italic">-</span>
+                }
+
+                return (
+                    <div className="flex flex-col gap-2 min-w-[180px]">
+                        {lead.extracted_campaign && (
+                            <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary font-bold py-0 px-2 w-fit text-[10px]">
+                                {lead.extracted_campaign}
+                            </Badge>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 items-center text-[9px] text-muted-foreground uppercase tracking-wider font-medium">
+                            {lead.utm_source && (
+                                <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                                    <Globe className="h-2.5 w-2.5" />
+                                    {lead.utm_source}
+                                </div>
+                            )}
+                            {lead.utm_medium && (
+                                <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                                    <Target className="h-2.5 w-2.5" />
+                                    {lead.utm_medium}
+                                </div>
+                            )}
+                            {lead.utm_content && (
+                                <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/50">
+                                    <Layers className="h-2.5 w-2.5" />
+                                    <span className="max-w-[100px] truncate">{lead.utm_content}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )
             }
         },
@@ -316,6 +440,40 @@ export function LeadsListView() {
                                         </div>
                                     </div>
 
+                                    {(lead.extracted_campaign || lead.utm_source) && (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">Marketing & Campanha</label>
+                                            <div className="bg-primary/5 p-3 rounded-md border border-primary/10 flex flex-col gap-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Megaphone className="h-4 w-4 text-primary" />
+                                                    <span className="text-sm font-bold text-primary">
+                                                        {lead.extracted_campaign || "Direto / Orgânico"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 text-[10px]">
+                                                    {lead.utm_source && (
+                                                        <Badge variant="secondary" className="bg-zinc-800/40 border-zinc-700/50 gap-1.5 font-medium px-2 py-0.5">
+                                                            <Globe className="h-3 w-3 text-muted-foreground" />
+                                                            {lead.utm_source}
+                                                        </Badge>
+                                                    )}
+                                                    {lead.utm_medium && (
+                                                        <Badge variant="secondary" className="bg-zinc-800/40 border-zinc-700/50 gap-1.5 font-medium px-2 py-0.5">
+                                                            <Target className="h-3 w-3 text-muted-foreground" />
+                                                            {lead.utm_medium}
+                                                        </Badge>
+                                                    )}
+                                                    {lead.utm_content && (
+                                                        <Badge variant="secondary" className="bg-zinc-800/40 border-zinc-700/50 gap-1.5 font-medium px-2 py-0.5">
+                                                            <Layers className="h-3 w-3 text-muted-foreground" />
+                                                            {lead.utm_content}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-2">
                                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conteúdo da IA</label>
                                         <div className="bg-muted/50 p-4 rounded-md text-sm leading-relaxed max-h-[300px] overflow-y-auto border text-foreground/90">
@@ -328,13 +486,16 @@ export function LeadsListView() {
                                     </div>
 
                                     <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
-                                        <div className="flex items-center gap-2">
-                                            <MessageSquare className="h-3 w-3" />
-                                            {lead.contador_interacoes} interações
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <MessageSquare className="h-3 w-3" />
+                                                {lead.contador_interacoes} interações
+                                            </div>
+                                            <div>
+                                                ID: <span className="font-mono">{lead.id.substring(0, 8)}...</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            ID: <span className="font-mono">{lead.id.substring(0, 8)}...</span>
-                                        </div>
+
                                     </div>
                                 </div>
                             </DialogContent>
@@ -360,11 +521,8 @@ export function LeadsListView() {
                 )
             }
         },
-
-
         {
             accessorKey: "agent_id",
-
             header: () => <div className="text-right">Agente</div>,
             cell: ({ row }) => {
                 return (
@@ -395,29 +553,6 @@ export function LeadsListView() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
-                    {/* Botão Novo MQL (Oculto para V1) */}
-                    {/* 
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="gap-2">
-                                <UserPlus className="h-4 w-4" />
-                                <span className="hidden sm:inline">Novo MQL</span>
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Cadastrar Novo MQL (Salesforce)</DialogTitle>
-                                <DialogDescription>
-                                    Preencha os dados abaixo para cadastrar diretamente no Salesforce.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <LeadRegistrationForm onSuccess={() => {
-                                fetchLeads()
-                            }} />
-                        </DialogContent>
-                    </Dialog>
-                    */}
 
 
 
@@ -490,7 +625,7 @@ export function LeadsListView() {
                 {[
                     { id: 'all', label: 'Todos' },
                     { id: 'connected', label: 'Conectados' },
-                    { id: 'cold', label: 'Frios' }
+                    { id: 'cold', label: 'Frios' },
 
 
                 ].map(s => (
@@ -515,10 +650,9 @@ export function LeadsListView() {
                                     <TableHead className="w-[140px]">Data</TableHead>
                                     <TableHead className="min-w-[200px]">Lead / Empresa</TableHead>
                                     <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
+                                    <TableHead className="min-w-[180px]">Origem & Campanha</TableHead>
                                     <TableHead className="text-center">Resumo</TableHead>
                                     <TableHead className="text-center">Status</TableHead>
-
-
                                     <TableHead className="text-right">Agente</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -527,11 +661,10 @@ export function LeadsListView() {
                                     <TableRow key={i}>
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="space-y-2"><div className="h-4 w-32 bg-muted animate-pulse rounded" /><div className="h-3 w-20 bg-muted animate-pulse rounded" /></div></TableCell>
-                                        <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
+                                        <TableCell><div className="space-y-2"><div className="h-4 w-24 bg-muted animate-pulse rounded" /><div className="h-3 w-16 bg-muted animate-pulse rounded" /></div></TableCell>
                                         <TableCell><div className="h-4 w-8 mx-auto bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full mx-auto" /></TableCell>
-
-
+                                        <TableCell><div className="h-6 w-24 bg-muted animate-pulse rounded-full mx-auto" /></TableCell>
                                         <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
                                     </TableRow>
                                 ))}

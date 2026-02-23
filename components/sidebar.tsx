@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Bell, LogOut, ChevronsUpDown } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Bell, LogOut, ChevronsUpDown, Megaphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSession, signOut } from "next-auth/react"
@@ -27,18 +27,19 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
 
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        // { id: "insights", label: "Analytics", icon: BarChart3 },
-        { id: "leads", label: "Leads Detalhados", icon: Users },
-        // { id: "reports", label: "Relatórios", icon: FileText },
+        { id: "leads", label: "Leads", icon: Users },
+        { id: "campaigns", label: "Campanhas", icon: Megaphone },
     ]
 
 
 
     const bottomItems = [
         { id: "updates", label: "Novidades", icon: Bell },
-        { id: "settings", label: "Configurações", icon: Settings },
+        { id: "settings", label: "Configurações", icon: Settings, adminOnly: true },
         { id: "help", label: "Ajuda", icon: HelpCircle },
     ]
+
+    const filteredBottomItems = bottomItems.filter(item => !item.adminOnly || (user as any)?.role === 'admin')
 
     return (
         <aside className={cn(
@@ -112,7 +113,7 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
                         </h2>
                     )}
                     <nav className="space-y-1">
-                        {bottomItems.map((item) => (
+                        {filteredBottomItems.map((item) => (
                             <Button
                                 key={item.id}
                                 variant={activeView === item.id ? "secondary" : "ghost"}

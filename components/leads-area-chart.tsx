@@ -59,11 +59,8 @@ export function LeadsAreaChart() {
     // --- Estados de Controle ---
     // --- Estados de Controle ---
     const [loading, setLoading] = useState(true)
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 7),
-        to: new Date(),
-    })
-    const [metricType, setMetricType] = useState<"total" | "connected" | "comparison">("connected")
+    const [date, setDate] = useState<DateRange | undefined>(undefined)
+    const [metricType, setMetricType] = useState<"total" | "connected" | "comparison">("comparison")
 
     // --- Configurações Personalizáveis ---
     const [interactionThreshold, setInteractionThreshold] = useState(3)
@@ -192,7 +189,8 @@ export function LeadsAreaChart() {
         try {
             setLoading(true)
 
-            const fromDate = date?.from || subDays(new Date(), 7)
+            const defaultFrom = subDays(new Date(), 7)
+            const fromDate = date?.from || defaultFrom
             const toDate = date?.to || new Date()
 
             // Adjust to end of day
@@ -277,7 +275,7 @@ export function LeadsAreaChart() {
             let fillStart = new Date(fromDate)
 
             for (let d = new Date(fillStart); d <= toDate; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                const dateStr = d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '')
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: new Date(d) }
                     selectedAgents.forEach((agent: string) => {
@@ -293,7 +291,7 @@ export function LeadsAreaChart() {
             // 2. Preencher com dados reais
             data?.forEach((lead: any) => {
                 const dateObj = new Date(lead.created_at)
-                const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '')
 
                 if (!leadsByDate.has(dateStr)) {
                     const initialData: any = { date: dateStr, fullDate: dateObj }
@@ -441,7 +439,7 @@ export function LeadsAreaChart() {
                     goal={calculateProportionalTarget(totalLeadsTarget, date)}
                     currentValue={kpis.totalLeads}
                     previousValue={previousKpis.totalLeads}
-                    description={`Total de leads únicos recebidos no período (${format(date?.from || new Date(), "dd/MM")} - ${format(date?.to || new Date(), "dd/MM")}).`}
+                    description={`Total de leads únicos recebidos no período (${format(date?.from || subDays(new Date(), 7), "dd/MM")} - ${format(date?.to || new Date(), "dd/MM")}).`}
                 />
                 <KpiCard
                     title="Leads Conectados"
@@ -538,7 +536,7 @@ export function LeadsAreaChart() {
                                     </linearGradient>
                                 ))}
                             </defs>
-                            <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.2} />
+                            <CartesianGrid vertical={true} strokeDasharray="3 3" strokeOpacity={0.15} />
                             <XAxis
                                 dataKey="date"
                                 tickLine={false}

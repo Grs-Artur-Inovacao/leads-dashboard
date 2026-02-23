@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Save, User, Settings, CheckCircle2, AlertCircle, Target, Users, Zap, Shield, HelpCircle, Bell, Share2, Sparkles, BarChart3 } from "lucide-react"
+import { Save, User, Settings, CheckCircle2, AlertCircle, Target, Users, Zap, Shield, HelpCircle, Bell, Share2, Sparkles, BarChart3, X } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { settingsService } from "@/lib/settings-service"
+import { cn } from "@/lib/utils"
 
 export function SettingsView() {
     const [interactionThreshold, setInteractionThreshold] = useState(3)
@@ -259,7 +260,7 @@ export function SettingsView() {
 
                 {/* Column 3: Agent Management (Right Side) */}
                 <div className="space-y-6">
-                    <Card className="shadow-sm border-muted h-full">
+                    <Card className="shadow-sm border-muted h-fit">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
@@ -297,8 +298,162 @@ export function SettingsView() {
                         </CardContent>
                     </Card>
                 </div>
-
             </div>
+
+            {/* User Whitelist Management Section */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Shield className="h-5 w-5 text-primary" />
+                            Controle de Acesso (Whitelist)
+                        </h3>
+                        <p className="text-sm text-muted-foreground">Gerencie quem pode acessar o dashboard e suas permissões.</p>
+                    </div>
+                </div>
+
+                <Card className="overflow-hidden border-muted">
+                    <UserWhitelistManager />
+                </Card>
+            </div>
+        </div>
+    )
+}
+
+function UserWhitelistManager() {
+    const [users, setUsers] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+
+    const fetchUsers = async () => {
+        setLoading(true)
+        try {
+            const { data, error } = await supabase
+                .schema('dashboard_config')
+                .from('user_whitelist')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+            setUsers(data || [])
+        } catch (err) {
+            console.error("Erro ao buscar whitelist:", err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchUsers()
+    }, [])
+
+    const toggleAccess = async (email: string, currentAccess: boolean) => {
+        try {
+            const { error } = await supabase
+                .schema('dashboard_config')
+                .from('user_whitelist')
+                .update({ has_access: !currentAccess })
+                .eq('email', email)
+
+            if (error) throw error
+            setUsers(users.map(u => u.email === email ? { ...u, has_access: !currentAccess } : u))
+        } catch (err) {
+            console.error("Erro ao atualizar acesso:", err)
+        }
+    }
+
+    const updateRole = async (email: string, newRole: string) => {
+        try {
+            const { error } = await supabase
+                .schema('dashboard_config')
+                .from('user_whitelist')
+                .update({ role: newRole })
+                .eq('email', email)
+
+            if (error) throw error
+            setUsers(users.map(u => u.email === email ? { ...u, role: newRole } : u))
+        } catch (err) {
+            console.error("Erro ao atualizar role:", err)
+        }
+    }
+
+    if (loading) return <div className="p-8 text-center text-muted-foreground">Carregando usuários...</div>
+
+    return (
+        <div className="relative overflow-x-auto">
+            <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-muted">
+                    <tr>
+                        <th className="px-6 py-4 font-medium">Usuário</th>
+                        <th className="px-6 py-4 font-medium">Departamento</th>
+                        <th className="px-6 py-4 font-medium text-center">Acesso</th>
+                        <th className="px-6 py-4 font-medium text-center">Role</th>
+                        <th className="px-6 py-4 font-medium text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-muted/30">
+                    {users.map((user) => (
+                        <tr key={user.id} className="hover:bg-muted/10 transition-colors">
+                            <td className="px-6 py-4">
+                                <div className="font-medium text-foreground">{user.email}</div>
+                                <div className="text-[10px] text-muted-foreground">Visto em: {new Date(user.updated_at).toLocaleDateString()}</div>
+                            </td>
+                            <td className="px-6 py-4 capitalize">
+                                <Badge variant="outline" className="text-[10px] font-normal">
+                                    {user.department}
+                                </Badge>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                                <button
+                                    onClick={() => toggleAccess(user.email, user.has_access)}
+                                    className={cn(
+                                        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-bold transition-all",
+                                        user.has_access
+                                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                                            : "bg-red-500/10 border-red-500/20 text-red-500"
+                                    )}
+                                >
+                                    {user.has_access ? "Liberado" : "Bloqueado"}
+                                </button>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                                <select
+                                    value={user.role}
+                                    onChange={(e) => updateRole(user.email, e.target.value)}
+                                    className="bg-transparent border-none text-xs focus:ring-0 cursor-pointer text-muted-foreground hover:text-foreground"
+                                >
+                                    <option value="user">User</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                    onClick={async () => {
+                                        if (confirm("Deseja realmente remover este usuário?")) {
+                                            const { error } = await supabase
+                                                .schema('dashboard_config')
+                                                .from('user_whitelist')
+                                                .delete()
+                                                .eq('email', user.email)
+                                            if (!error) fetchUsers()
+                                        }
+                                    }}
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {users.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground italic">
+                    Nenhum usuário registrado na whitelist.
+                </div>
+            )}
         </div>
     )
 }

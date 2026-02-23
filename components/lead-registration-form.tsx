@@ -240,8 +240,8 @@ export function LeadRegistrationForm({ onSuccess, initialData }: LeadRegistratio
                 email: session?.user?.email || "unknown"
             }
 
-            // Call Supabase Edge Function to pass data to Salesforce (TEST MODE)
-            const { data, error } = await supabase.functions.invoke('register-mql-test', {
+            // Call Supabase Edge Function to pass data to Salesforce (PRODUCTION MODE)
+            const { data, error } = await supabase.functions.invoke('register-mql', {
                 body: payload
             })
 
@@ -394,7 +394,6 @@ export function LeadRegistrationForm({ onSuccess, initialData }: LeadRegistratio
                         <Select
                             value={formData.leadSource}
                             onValueChange={(val) => handleSelectChange("leadSource", val)}
-                            disabled={true}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecione a origem" />
@@ -412,7 +411,6 @@ export function LeadRegistrationForm({ onSuccess, initialData }: LeadRegistratio
                         <Select
                             value={formData.subOrigin}
                             onValueChange={(val) => handleSelectChange("subOrigin", val)}
-                            disabled={true}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder={formData.leadSource ? "Selecione a suborigem" : "Selecione a origem primeiro"} />
