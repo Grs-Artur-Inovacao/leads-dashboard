@@ -100,10 +100,7 @@ export function LeadsListView() {
     const [count, setCount] = useState(0)
 
     // Filtros
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    })
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
 

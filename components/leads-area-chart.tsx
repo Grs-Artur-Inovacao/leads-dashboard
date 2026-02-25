@@ -157,7 +157,10 @@ export function LeadsAreaChart() {
 
     // Função para calcular meta proporcional ao período selecionado
     const calculateProportionalTarget = (monthlyTarget: number, dateRange: DateRange | undefined) => {
-        if (!dateRange?.from) return monthlyTarget
+        // Se não houver data selecionada, assumimos o padrão de 7 dias (mesmo padrão do resto do dashboard)
+        if (!dateRange?.from) {
+            return Math.round(monthlyTarget * (7 / 30))
+        }
         const end = dateRange.to || dateRange.from
 
         try {
@@ -457,13 +460,24 @@ export function LeadsAreaChart() {
     }, [date, selectedAgents, metricType, interactionThreshold])
 
     useEffect(() => {
-        const channel = supabase
+        const infoLeadsChannel = supabase
             .channel('info-leads-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'info_lead' }, () => {
                 fetchLeadsData()
             })
             .subscribe()
-        return () => { supabase.removeChannel(channel) }
+
+        const campaignLogsChannel = supabase
+            .channel('campaign-logs-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_log' }, () => {
+                fetchCampaignLogs()
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(infoLeadsChannel)
+            supabase.removeChannel(campaignLogsChannel)
+        }
     }, [date, selectedAgents, metricType, interactionThreshold])
 
 

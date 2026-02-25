@@ -12,7 +12,6 @@ import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
 import { HelpView } from "@/components/help-view"
 import { UpdatesView } from "@/components/updates-view"
-import { SmartInsightsView } from "@/components/smart-insights-view"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -59,16 +58,7 @@ export default function Home() {
 
                     {currentView === "dashboard" && <LeadsAreaChart />}
 
-                    {currentView === "insights" && <SmartInsightsView />}
-
                     {currentView === "leads" && <LeadsListView />}
-
-
-                    {currentView === "reports" && (
-                        <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
-                            Em breve: Relatórios Avançados
-                        </div>
-                    )}
 
                     {currentView === "settings" && (session?.user as any)?.role === 'admin' ? (
                         <SettingsView />
