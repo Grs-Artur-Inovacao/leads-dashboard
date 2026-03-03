@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Save, User, Settings, CheckCircle2, AlertCircle, Target, Users, Zap, Shield, HelpCircle, Bell, Share2, Sparkles, BarChart3, X } from "lucide-react"
+import { Save, User, Settings, CheckCircle2, AlertCircle, Target, Users, Zap, Shield, HelpCircle, Bell, Share2, Sparkles, BarChart3, X, MessageSquare } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { settingsService } from "@/lib/settings-service"
 import { cn } from "@/lib/utils"
@@ -219,6 +219,8 @@ export function SettingsView() {
                             </div>
                         </CardContent>
                     </Card>
+
+
                 </div>
 
                 {/* Column 2: Future & System Parameters */}

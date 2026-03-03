@@ -38,7 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2, BadgeCheck, Globe, Target, Layers, Megaphone } from "lucide-react"
+import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2, BadgeCheck, Globe, Target, Layers, Megaphone, UserPlus, Cloud } from "lucide-react"
 
 
 import { LeadRegistrationForm } from "./lead-registration-form"
@@ -493,6 +493,42 @@ export function LeadsListView() {
                                             </div>
                                         </div>
 
+                                        {lead.is_mql ? (
+                                            <Badge variant="secondary" className="bg-zinc-800/50 text-zinc-400 border-zinc-700/50 gap-1.5 py-1 px-3 font-medium">
+                                                <Cloud className="h-3.5 w-3.5 fill-zinc-400/10" />
+                                                Salesforce
+                                            </Badge>
+                                        ) : (
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" variant="outline" className="h-8 gap-2 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary">
+                                                        <UserPlus className="h-3.5 w-3.5" />
+                                                        Qualificar como MQL
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Qualificar Lead (MQL)</DialogTitle>
+                                                        <DialogDescription>
+                                                            Preencha os dados do lead para cadastrá-lo como MQL no Salesforce.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <LeadRegistrationForm
+                                                        initialData={{
+                                                            leadId: lead.id,
+                                                            firstName: lead.first_name,
+                                                            lastName: lead.last_name,
+                                                            phone: lead.phone,
+                                                            company: lead.company,
+                                                            interest: lead.product,
+                                                            email: lead.email,
+                                                            cnpj: lead.cnpj
+                                                        }}
+                                                        onSuccess={() => fetchLeads()}
+                                                    />
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                     </div>
                                 </div>
                             </DialogContent>
@@ -518,6 +554,7 @@ export function LeadsListView() {
                 )
             }
         },
+
         {
             accessorKey: "agent_id",
             header: () => <div className="text-right">Agente</div>,
@@ -532,7 +569,7 @@ export function LeadsListView() {
                 )
             }
         },
-    ], [agentNames, interactionThreshold]) // Re-memoize if dependencies change
+    ], [agentNames, interactionThreshold, fetchLeads]) // Re-memoize if dependencies change
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -649,6 +686,7 @@ export function LeadsListView() {
                                     <TableHead className="min-w-[150px]">Interesse (Produto)</TableHead>
                                     <TableHead className="min-w-[180px]">Origem & Campanha</TableHead>
                                     <TableHead className="text-center">Resumo</TableHead>
+
                                     <TableHead className="text-center">Status</TableHead>
                                     <TableHead className="text-right">Agente</TableHead>
                                 </TableRow>
@@ -659,8 +697,9 @@ export function LeadsListView() {
                                         <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="space-y-2"><div className="h-4 w-32 bg-muted animate-pulse rounded" /><div className="h-3 w-20 bg-muted animate-pulse rounded" /></div></TableCell>
                                         <TableCell><div className="space-y-2"><div className="h-4 w-24 bg-muted animate-pulse rounded" /><div className="h-3 w-16 bg-muted animate-pulse rounded" /></div></TableCell>
+                                        <TableCell><div className="h-4 w-12 bg-muted animate-pulse rounded" /></TableCell>
                                         <TableCell><div className="h-4 w-8 mx-auto bg-muted animate-pulse rounded" /></TableCell>
-                                        <TableCell><div className="h-6 w-20 bg-muted animate-pulse rounded-full mx-auto" /></TableCell>
+
                                         <TableCell><div className="h-6 w-24 bg-muted animate-pulse rounded-full mx-auto" /></TableCell>
                                         <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
                                     </TableRow>

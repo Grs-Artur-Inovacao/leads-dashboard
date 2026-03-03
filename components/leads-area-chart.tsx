@@ -4,6 +4,13 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { supabase } from "@/lib/supabaseClient"
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import {
     Card,
     CardContent,
     CardDescription,
@@ -28,7 +35,7 @@ import {
 import { AgentSelector } from "./agent-selector"
 import { KpiCard } from "./kpi-card"
 import { Users, MessageSquare, Activity, Settings, HelpCircle, Calendar as CalendarIcon } from "lucide-react"
-import { format, subDays, differenceInDays, getDaysInMonth, eachDayOfInterval } from "date-fns"
+import { format, subDays, differenceInDays, getDaysInMonth, eachDayOfInterval, startOfMonth, endOfMonth, setMonth, setYear } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
@@ -40,6 +47,8 @@ import {
     Legend,
     BarChart,
     Bar,
+    LineChart,
+    Line,
     ResponsiveContainer,
     Tooltip as RechartsTooltip
 } from "recharts"
@@ -381,9 +390,11 @@ export function LeadsAreaChart() {
                     selectedAgents.forEach((agent: string) => {
                         initialData[agent] = 0 // Total
                         initialData[`${agent}_connected`] = 0 // Conectado
+                        initialData[`${agent}_mql`] = 0 // MQL
                     })
                     initialData['total'] = 0
                     initialData['connected'] = 0
+                    initialData['mql'] = 0
                     leadsByDate.set(dateStr, initialData)
                 }
             }
@@ -422,10 +433,18 @@ export function LeadsAreaChart() {
                         dayData[`${agent}_connected`] = (dayData[`${agent}_connected`] || 0) + 1
                     }
 
+                    // MQL por Agente
+                    if (lead.is_mql) {
+                        dayData[`${agent}_mql`] = (dayData[`${agent}_mql`] || 0) + 1
+                    }
+
                     // Totais Globais (para Modo Comparativo)
                     dayData['total'] = (dayData['total'] || 0) + 1
                     if (isConnected) {
                         dayData['connected'] = (dayData['connected'] || 0) + 1
+                    }
+                    if (lead.is_mql) {
+                        dayData['mql'] = (dayData['mql'] || 0) + 1
                     }
                 }
             })
@@ -491,14 +510,6 @@ export function LeadsAreaChart() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <AgentSelector
-                        agents={availableAgents}
-                        selectedAgents={selectedAgents}
-                        onChange={setSelectedAgents}
-                        isLoading={loading && availableAgents.length === 0}
-                        namesMap={agentNames}
-                    />
-
                     <div className="flex items-center gap-2">
                         <div className="grid gap-2">
                             <Popover>
@@ -540,6 +551,14 @@ export function LeadsAreaChart() {
                             </Popover>
                         </div>
                     </div>
+
+                    <AgentSelector
+                        agents={availableAgents}
+                        selectedAgents={selectedAgents}
+                        onChange={setSelectedAgents}
+                        isLoading={loading && availableAgents.length === 0}
+                        namesMap={agentNames}
+                    />
                 </div>
             </div>
 
@@ -548,7 +567,6 @@ export function LeadsAreaChart() {
                 <KpiCard
                     title="Leads Totais"
                     value={kpis.totalLeads}
-                    goal={calculateProportionalTarget(totalLeadsTarget, date)}
                     currentValue={kpis.totalLeads}
                     previousValue={previousKpis.totalLeads}
                     description={`Total de leads únicos recebidos no período (${format(date?.from || subDays(new Date(), 7), "dd/MM")} - ${format(date?.to || new Date(), "dd/MM")}).`}
@@ -565,6 +583,42 @@ export function LeadsAreaChart() {
                         value: `${kpis.avgConnectivity.toFixed(1)}%`,
                         goal: connectivityTarget
                     }}
+                    chart={
+                        <ChartContainer config={{ conversion: { label: "Conversão", color: "#3b82f6" } }} className="h-full w-full">
+                            <LineChart
+                                data={chartData.map(d => ({
+                                    ...d,
+                                    conversion: d.total > 0 ? (d.connected / d.total) * 100 : 0
+                                }))}
+                                margin={{ left: 12, right: 12, top: 5, bottom: 5 }}
+                            >
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#333" />
+                                <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    tick={{ fontSize: 10, fill: '#666' }}
+                                />
+                                <YAxis hide domain={[0, 100]} />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent
+                                        hideLabel
+                                        formatter={(value) => `${Number(value).toFixed(1)}%`}
+                                    />}
+                                />
+                                <Line
+                                    dataKey="conversion"
+                                    type="monotone"
+                                    stroke="#3b82f6"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#000" }}
+                                    activeDot={{ r: 6 }}
+                                />
+                            </LineChart>
+                        </ChartContainer>
+                    }
                 />
                 <KpiCard
                     title="Leads MQL"
@@ -572,12 +626,48 @@ export function LeadsAreaChart() {
                     goal={calculateProportionalTarget(mqlTarget, date)}
                     currentValue={kpis.mqlLeads}
                     previousValue={previousKpis.mqlLeads}
-                    description="Leads qualificados pelo time de pré-vendas e enviados ao CRM."
+                    description="Leads qualificados pelo time de pré-vendas."
                     secondaryMetric={{
                         label: "Conversão (Conectado → MQL)",
                         value: kpis.connectedLeads > 0 ? `${((kpis.mqlLeads / kpis.connectedLeads) * 100).toFixed(1)}%` : "0%",
                         goal: mqlTarget
                     }}
+                    chart={
+                        <ChartContainer config={{ conversion: { label: "Conversão", color: "#3b82f6" } }} className="h-full w-full">
+                            <LineChart
+                                data={chartData.map(d => ({
+                                    ...d,
+                                    conversion: d.connected > 0 ? (d.mql / d.connected) * 100 : 0
+                                }))}
+                                margin={{ left: 12, right: 12, top: 5, bottom: 5 }}
+                            >
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#333" />
+                                <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    tick={{ fontSize: 10, fill: '#666' }}
+                                />
+                                <YAxis hide domain={[0, 100]} />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent
+                                        hideLabel
+                                        formatter={(value) => `${Number(value).toFixed(1)}%`}
+                                    />}
+                                />
+                                <Line
+                                    dataKey="conversion"
+                                    type="monotone"
+                                    stroke="#3b82f6"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#000" }}
+                                    activeDot={{ r: 6 }}
+                                />
+                            </LineChart>
+                        </ChartContainer>
+                    }
                     isPlaceholder={true}
                 />
             </div>

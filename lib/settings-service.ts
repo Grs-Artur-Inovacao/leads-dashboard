@@ -8,6 +8,9 @@ export interface DashboardSettings {
     total_leads_target: number
     connected_leads_target: number
     mql_target: number
+    daily_msg_target: number
+    monthly_msg_target: number
+    lifetime_msg_milestone: number
     agent_names: Record<string, string>
 }
 
@@ -18,6 +21,9 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
     total_leads_target: 100,
     connected_leads_target: 50,
     mql_target: 10,
+    daily_msg_target: 20,
+    monthly_msg_target: 500,
+    lifetime_msg_milestone: 5000,
     agent_names: {}
 }
 

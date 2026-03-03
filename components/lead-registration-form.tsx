@@ -240,8 +240,8 @@ export function LeadRegistrationForm({ onSuccess, initialData }: LeadRegistratio
                 email: session?.user?.email || "unknown"
             }
 
-            // Call Supabase Edge Function to pass data to Salesforce (PRODUCTION MODE)
-            const { data, error } = await supabase.functions.invoke('register-mql', {
+            // Call Supabase Edge Function to pass data to Salesforce (TEST MODE)
+            const { data, error } = await supabase.functions.invoke('register-mql-test', {
                 body: payload
             })
 

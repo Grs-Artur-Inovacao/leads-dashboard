@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 interface KpiCardProps {
     title: string
     value: number | string
-    goal: number | string
+    goal?: number | string
     currentValue: number // used for goal calculation
     previousValue?: number // used for growth calculation
     secondaryMetric?: {
@@ -16,6 +16,7 @@ interface KpiCardProps {
     description: string
     icon?: React.ReactNode
     isPlaceholder?: boolean
+    chart?: React.ReactNode // New prop for a detailed chart
 }
 
 export function KpiCard({
@@ -27,6 +28,7 @@ export function KpiCard({
     secondaryMetric,
     description,
     icon,
+    chart,
     isPlaceholder = false
 }: KpiCardProps) {
     // Calcular porcentagem da meta principal
@@ -57,7 +59,10 @@ export function KpiCard({
     }
 
     return (
-        <Card className="flex flex-col h-full shadow-md border-muted">
+        <Card className={cn(
+            "flex flex-col h-full shadow-md border-muted",
+            chart ? "min-h-[420px]" : "min-h-[290px]"
+        )}>
             <CardContent className="p-6 flex-1 flex flex-col justify-between">
                 <div>
                     {/* Header: Title and Goal Box */}
@@ -72,20 +77,22 @@ export function KpiCard({
                         </div>
 
                         {/* Goal Box (Top Right) - Meta Principal */}
-                        <div className={cn(
-                            "flex flex-col items-end px-3 py-1.5 rounded-lg border bg-muted/30",
-                            isGoalMet && !isPlaceholder ? "border-emerald-500/30 bg-emerald-500/5" : "border-muted"
-                        )}>
-                            <span className={cn(
-                                "text-sm font-bold",
-                                isGoalMet && !isPlaceholder ? "text-emerald-600" : "text-muted-foreground"
+                        {goal !== undefined && (
+                            <div className={cn(
+                                "flex flex-col items-end px-3 py-1.5 rounded-lg border bg-muted/30",
+                                isGoalMet && !isPlaceholder ? "border-emerald-500/30 bg-emerald-500/5" : "border-muted"
                             )}>
-                                {isPlaceholder ? "..." : `${goalPercentage.toFixed(1)}%`}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">
-                                Meta: {isPlaceholder ? "..." : goal}
-                            </span>
-                        </div>
+                                <span className={cn(
+                                    "text-sm font-bold",
+                                    isGoalMet && !isPlaceholder ? "text-emerald-600" : "text-muted-foreground"
+                                )}>
+                                    {isPlaceholder ? "..." : `${goalPercentage.toFixed(1)}%`}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                                    Meta: {isPlaceholder ? "..." : goal}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Main Value */}
@@ -108,26 +115,34 @@ export function KpiCard({
                     </div>
                 </div>
 
+                {/* Optional Detailed Chart */}
+                {chart && (
+                    <div className="flex-1 w-full min-h-[120px] max-h-[160px] my-4 overflow-hidden rounded-lg flex items-center justify-center">
+                        {chart}
+                    </div>
+                )}
+
                 {/* Secondary Metric (Middle Section) */}
                 {secondaryMetric && (
                     <div className="mt-6 py-3 border-t border-dashed border-muted-foreground/30">
                         <p className="text-xs text-muted-foreground uppercase font-medium mb-1">
                             {secondaryMetric.label}
                         </p>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-bold text-foreground/90">
-                                {isPlaceholder ? "..." : secondaryMetric.value}
-                            </span>
-
-                            {/* Alteração: Mostrar Meta direto, sem cálculo de % batida */}
-                            {(secondaryMetric.goal !== undefined || isPlaceholder) && (
-                                <span className={cn(
-                                    "text-xs font-medium px-2 py-0.5 rounded-full border",
-                                    "bg-muted/50 text-muted-foreground border-muted-foreground/20"
-                                )}>
-                                    {isPlaceholder ? "Meta: ..." : `Meta: ${secondaryMetric.goal}%`}
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-xl font-bold text-foreground/90">
+                                    {isPlaceholder ? "..." : secondaryMetric.value}
                                 </span>
-                            )}
+
+                                {(secondaryMetric.goal !== undefined || isPlaceholder) && (
+                                    <span className={cn(
+                                        "text-xs font-medium px-2 py-0.5 rounded-full border",
+                                        "bg-muted/50 text-muted-foreground border-muted-foreground/20"
+                                    )}>
+                                        {isPlaceholder ? "Meta: ..." : `Meta: ${secondaryMetric.goal}%`}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}

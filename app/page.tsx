@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { cn } from "@/lib/utils"
+
+import { DashboardAdventure } from "@/components/dashboard-adventure"
 
 export default function Home() {
     const { data: session, status } = useSession()
@@ -52,11 +55,17 @@ export default function Home() {
             </div>
 
             {/* Conteúdo Principal */}
-            <main className="flex-1 w-full transition-all duration-300">
-                <div className="container mx-auto p-6 md:p-8 max-w-[1600px] space-y-8">
+            <main className={cn(
+                "flex-1 w-full transition-all duration-300",
+                currentView === "dashboard" ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
+            )}>
+                <div className={cn(
+                    "container mx-auto max-w-[1600px]",
+                    currentView === "dashboard" ? "p-0 h-full" : "p-6 md:p-8 space-y-8"
+                )}>
 
 
-                    {currentView === "dashboard" && <LeadsAreaChart />}
+                    {currentView === "dashboard" && <DashboardAdventure />}
 
                     {currentView === "leads" && <LeadsListView />}
 
