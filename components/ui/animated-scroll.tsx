@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -9,30 +9,49 @@ interface ScrollAdventureProps {
     children: React.ReactNode[];
     className?: string;
     pageLabels?: string[];
+    autoPlayInterval?: number; // em milissegundos
 }
 
-export default function ScrollAdventure({ children, className, pageLabels }: ScrollAdventureProps) {
+export default function ScrollAdventure({ children, className, pageLabels, autoPlayInterval = 5000 }: ScrollAdventureProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeIndex, setActiveIndex] = useState(0);
+    const [isPaused, setIsPaused] = useState(false);
 
     const handleScroll = () => {
         if (!containerRef.current) return;
         const { scrollTop, clientHeight } = containerRef.current;
-        const index = Math.round(scrollTop / clientHeight);
-        if (index !== activeIndex) {
+        const index = Math.round(scrollTop / (clientHeight || 1));
+        if (index !== activeIndex && !isNaN(index)) {
             setActiveIndex(index);
         }
     };
 
     const scrollToPage = (index: number) => {
-        containerRef.current?.scrollTo({
+        if (!containerRef.current) return;
+        containerRef.current.scrollTo({
             top: index * containerRef.current.clientHeight,
             behavior: "smooth",
         });
     };
 
+    // Auto-rotação
+    useEffect(() => {
+        if (!autoPlayInterval || children.length <= 1 || isPaused) return;
+
+        const interval = setInterval(() => {
+            const nextIndex = (activeIndex + 1) % children.length;
+            scrollToPage(nextIndex);
+        }, autoPlayInterval);
+
+        return () => clearInterval(interval);
+    }, [activeIndex, children.length, autoPlayInterval, isPaused]);
+
     return (
-        <div className="relative w-full h-screen overflow-hidden group">
+        <div
+            className="relative w-full h-screen overflow-hidden group"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+        >
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
@@ -57,17 +76,23 @@ export default function ScrollAdventure({ children, className, pageLabels }: Scr
                             key={index}
                             onClick={() => scrollToPage(index)}
                             className={cn(
-                                "w-2.5 h-2.5 rounded-full transition-all duration-500 relative",
-                                activeIndex === index
-                                    ? "bg-white w-8"
-                                    : "bg-white/10 hover:bg-white/30"
+                                "w-2.5 h-2.5 rounded-full transition-all duration-500 relative bg-white/10 overflow-hidden",
+                                activeIndex === index ? "w-8" : "hover:bg-white/30"
                             )}
                             aria-label={`Ir para página ${index + 1}`}
                         >
                             {activeIndex === index && (
                                 <motion.div
+                                    key={activeIndex}
                                     layoutId="indicator"
-                                    className="absolute inset-0 bg-white/20 rounded-full"
+                                    className="absolute inset-0 bg-white"
+                                    initial={{ scaleX: 0 }}
+                                    animate={{ scaleX: 1 }}
+                                    transition={{
+                                        duration: (autoPlayInterval / 1000),
+                                        ease: "linear"
+                                    }}
+                                    style={{ originX: 0 }}
                                 />
                             )}
                         </button>

@@ -589,8 +589,12 @@ export function ConversationsAnalysis() {
                                             <span className="font-bold text-white w-6">{item.state}</span>
                                             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.count} leads</span>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-[10px] text-muted-foreground">Conexão:</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-muted-foreground">Repres. Total:</span>
+                                            <span className="font-bold text-white">
+                                                {item.percentage.toFixed(1)}%
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground ml-2">Conexão:</span>
                                             <span className="font-bold text-white">
                                                 {item.connectivityRate.toFixed(1)}%
                                             </span>
@@ -600,8 +604,8 @@ export function ConversationsAnalysis() {
                                         <div
                                             className="h-full bg-white transition-all duration-500"
                                             style={{
-                                                width: `${item.connectivityRate}%`,
-                                                opacity: 1 - (index * 0.15)
+                                                width: `${item.percentage}%`,
+                                                opacity: 1 - (index * 0.08)
                                             }}
                                         />
                                     </div>
