@@ -12,6 +12,7 @@ import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
 import { HelpView } from "@/components/help-view"
 import { UpdatesView } from "@/components/updates-view"
+import { AgentesView } from "@/components/agentes-view"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -79,6 +80,8 @@ export default function Home() {
                     ) : null}
 
                     {currentView === "updates" && <UpdatesView />}
+
+                    {currentView === "agentes" && <AgentesView />}
 
                     {currentView === "help" && <HelpView />}
 

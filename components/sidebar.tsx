@@ -28,6 +28,7 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
     const menuItems = [
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         { id: "leads", label: "Leads", icon: Users },
+        { id: "agentes", label: "Agentes", icon: FileText },
     ]
 
 
