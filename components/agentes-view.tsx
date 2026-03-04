@@ -26,17 +26,36 @@ export function AgentesView() {
         initialized.current = true
 
         const performInitialSync = async () => {
-            setSyncing(true)
-            await syncWithGithub()
-            const list = await listRecipes()
-            setRecipes(list)
+            try {
+                // 1. Initial load from local cache/disk
+                const list = await listRecipes()
+                if (list && list.length > 0) {
+                    setRecipes(list)
+                    if (list.includes("renata_v2.yaml")) {
+                        handleSelectRecipe("renata_v2.yaml")
+                    } else {
+                        handleSelectRecipe(list[0])
+                    }
+                }
 
-            if (list.includes("renata_v2.yaml")) {
-                handleSelectRecipe("renata_v2.yaml")
-            } else if (list.length > 0) {
-                handleSelectRecipe(list[0])
+                // 2. Background sync
+                setSyncing(true)
+                const syncResult = await syncWithGithub()
+
+                // 3. Optional reload if sync succeeded
+                if (syncResult && syncResult.success) {
+                    const updatedList = await listRecipes()
+                    setRecipes(updatedList)
+                    // If nothing was selected yet, select now
+                    if (!selectedRecipeName && updatedList.length > 0) {
+                        handleSelectRecipe(updatedList[0])
+                    }
+                }
+            } catch (error) {
+                console.error("Critical error during initial load:", error)
+            } finally {
+                setSyncing(false)
             }
-            setSyncing(false)
         }
 
         performInitialSync()
