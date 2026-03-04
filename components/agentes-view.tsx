@@ -99,15 +99,14 @@ export function AgentesView() {
                 <div className="flex flex-col gap-1 px-8 py-6 border-b border-white/[0.04] bg-zinc-950/20 backdrop-blur-sm">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <div className="flex items-center gap-3">
-                                <Sparkles className="h-5 w-5 text-primary/70" />
+                            <div className="space-y-1">
                                 <h1 className="text-2xl font-bold tracking-tight text-white uppercase tracking-[0.1em]">
                                     Gestão de Agentes
                                 </h1>
+                                <p className="text-muted-foreground text-xs font-medium">
+                                    Modelagem e refinamento da inteligência artificial Alltech.
+                                </p>
                             </div>
-                            <p className="text-muted-foreground text-xs font-medium pl-8">
-                                Modelagem e refinamento da inteligência artificial Alltech.
-                            </p>
                         </div>
 
                         <AnimatePresence>
