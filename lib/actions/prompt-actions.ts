@@ -1,7 +1,6 @@
 "use server"
 
 import fs from "fs/promises"
-import fs_sync from "fs"
 import path from "path"
 import { exec } from "child_process"
 import { promisify } from "util"
@@ -31,8 +30,8 @@ export interface Recipe {
 
 // Helper to determine if we should use GitHub API
 const useGitHubApi = () => {
-    // If we're on Vercel OR the local path doesn't exist, we must use the API
-    return process.env.VERCEL === "1" || !fs_sync.existsSync(PROMPTS_ROOT);
+    // If we're on Vercel mode we use the API
+    return process.env.VERCEL === "1";
 }
 
 // Universal fetcher for GitHub content
@@ -62,29 +61,19 @@ async function fetchFromGitHub(repoPath: string, isRaw = false) {
 }
 
 export async function listRecipes() {
-    const logFile = path.join(process.cwd(), "debug.log")
-    const log = (msg: string) => {
-        try { fs_sync.appendFileSync(logFile, `${new Date().toISOString()} - ${msg}\n`) } catch (e) { }
-    }
-
     try {
         if (useGitHubApi()) {
-            log("LIST: Using GitHub API (Production/Vercel mode)")
             const contents = await fetchFromGitHub("SDR/recipes")
             const files = Array.isArray(contents)
                 ? contents.filter(item => item.type === "file" && (item.name.endsWith(".yaml") || item.name.endsWith(".yml")))
                 : []
-            const names = files.map(f => f.name)
-            log("LIST API: " + JSON.stringify(names))
-            return names
+            return files.map(f => f.name)
         } else {
-            log("LIST: Using Local Disk")
             const files = await fs.readdir(RECIPES_PATH)
-            const filtered = files.filter(f => f.endsWith(".yaml") || f.endsWith(".yml"))
-            return filtered
+            return files.filter(f => f.endsWith(".yaml") || f.endsWith(".yml"))
         }
     } catch (error: any) {
-        log("LIST ERROR: " + error.message)
+        console.error("Error listing recipes:", error)
         return []
     }
 }
@@ -150,17 +139,11 @@ export async function runBuild() {
 }
 
 export async function syncWithGithub() {
-    // In Vercel mode, sync is redundant since we fetch directly
     if (useGitHubApi()) return { success: true, message: "Production mode: Auto-fetching latest from GitHub." }
 
     try {
         const branch = "main"
-        const logFile = path.join(process.cwd(), "debug.log")
-        const log = (msg: string) => { try { fs_sync.appendFileSync(logFile, `${new Date().toISOString()} - ${msg}\n`) } catch (e) { } }
-
-        log("SYNC: Starting local sync in " + PROMPTS_ROOT)
         const { stdout, stderr } = await execAsync(`git pull origin ${branch}`, { cwd: PROMPTS_ROOT })
-        log("SYNC OK: " + stdout)
 
         return {
             success: true,
