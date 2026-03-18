@@ -18,6 +18,7 @@ export function SettingsView() {
     const [connectedLeadsTarget, setConnectedLeadsTarget] = useState(50)
     const [mqlTarget, setMqlTarget] = useState(10)
     const [agentNames, setAgentNames] = useState<Record<string, string>>({})
+    const [agentOwners, setAgentOwners] = useState<Record<string, string>>({})
     const [availableAgents, setAvailableAgents] = useState<string[]>([])
     const [isLoaded, setIsLoaded] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -36,6 +37,7 @@ export function SettingsView() {
                     setConnectivityTarget(settings.connectivity_target || 30)
                     setMqlTarget(settings.mql_target || 10)
                     setAgentNames(settings.agent_names || {})
+                    setAgentOwners(settings.agent_owners || {})
                 }
 
                 setIsLoaded(true)
@@ -78,7 +80,8 @@ export function SettingsView() {
                 interaction_threshold: interactionThreshold,
                 connectivity_target: connectivityTarget,
                 mql_target: mqlTarget,
-                agent_names: agentNames
+                agent_names: agentNames,
+                agent_owners: agentOwners,
             })
 
             setSaved(true)
@@ -283,16 +286,23 @@ export function SettingsView() {
                                 </div>
                             ) : (
                                 availableAgents.map(agent => (
-                                    <div key={agent} className="space-y-2">
-                                        <label className="text-sm font-medium leading-none truncate block" title={agent}>
+                                    <div key={agent} className="space-y-2 pb-4 border-b border-muted/30 last:border-0 last:pb-0">
+                                        <label className="text-xs font-mono text-muted-foreground truncate block" title={agent}>
                                             {agent}
                                         </label>
                                         <Input
                                             type="text"
-                                            placeholder="Definir apelido..."
+                                            placeholder="Apelido do agente..."
                                             value={agentNames[agent] || ""}
                                             onChange={(e) => setAgentNames(prev => ({ ...prev, [agent]: e.target.value }))}
-                                            className="font-mono bg-muted/30"
+                                            className="font-mono bg-muted/30 h-8 text-xs"
+                                        />
+                                        <Input
+                                            type="text"
+                                            placeholder="Responsável (nome do SDR)..."
+                                            value={agentOwners[agent] || ""}
+                                            onChange={(e) => setAgentOwners(prev => ({ ...prev, [agent]: e.target.value }))}
+                                            className="bg-muted/30 h-8 text-xs border-primary/20"
                                         />
                                     </div>
                                 ))

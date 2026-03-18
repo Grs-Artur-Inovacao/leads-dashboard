@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import { settingsService } from "@/lib/settings-service"
+import { useDashboard } from "@/lib/dashboard-context"
 import {
     Table,
     TableBody,
@@ -16,10 +18,8 @@ import {
     Pagination,
     PaginationContent,
     PaginationItem,
-    PaginationLink,
     PaginationNext,
     PaginationPrevious,
-    PaginationEllipsis
 } from "@/components/ui/pagination"
 import {
     Dialog,
@@ -34,18 +34,14 @@ import {
 
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AgentSelector } from "./agent-selector"
-import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, X, CheckCircle2, BadgeCheck, Globe, Target, Layers, Megaphone, UserPlus, Cloud } from "lucide-react"
-
-
+import { RefreshCw, Search, MessageSquare, Calendar as CalendarIcon, User, Briefcase, ShoppingBag, FileText, CheckCircle2, Globe, Target, Layers, Megaphone, UserPlus, Cloud } from "lucide-react"
 import { LeadRegistrationForm } from "./lead-registration-form"
-
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format, subDays } from "date-fns"
+import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
@@ -94,6 +90,14 @@ const extractCampaignName = (campaign: string | undefined): string => {
 
 
 export function LeadsListView() {
+    // --- Context Compartilhado ---
+    const {
+        settings,
+        settingsLoaded,
+        availableAgents,
+        agentsLoaded,
+    } = useDashboard()
+
     // --- Estados de Controle ---
     const [loading, setLoading] = useState(true)
     const [leads, setLeads] = useState<Lead[]>([])
@@ -102,50 +106,32 @@ export function LeadsListView() {
     // Filtros
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
     const [selectedAgents, setSelectedAgents] = useState<string[]>([])
-    const [availableAgents, setAvailableAgents] = useState<string[]>([])
 
     const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "cold">("all")
-
-
+    const [phoneSearch, setPhoneSearch] = useState("")
+    const [debouncedPhone, setDebouncedPhone] = useState("")
 
     // Paginação
     const [currentPage, setCurrentPage] = useState(1)
     const pageSize = 10
 
-    // Configurações
-    const [interactionThreshold, setInteractionThreshold] = useState(3)
-    const [agentNames, setAgentNames] = useState<Record<string, string>>({})
+    // Configurações (do Context)
+    const interactionThreshold = settingsLoaded ? settings.interaction_threshold : 3
+    const agentNames = settings.agent_names || {}
+    const agentOwners = settings.agent_owners || {}
 
-    // --- Carregar Configurações ---
+    // Auto-select de agentes quando o Context carregar
     useEffect(() => {
-        const loadSettings = () => {
-            const savedThreshold = localStorage.getItem('leads-dashboard-threshold')
-            const savedNames = localStorage.getItem('leads-dashboard-names')
-
-            if (savedThreshold) setInteractionThreshold(Number(savedThreshold))
-            if (savedNames) setAgentNames(JSON.parse(savedNames))
+        if (agentsLoaded && availableAgents.length > 0 && selectedAgents.length === 0) {
+            setSelectedAgents(availableAgents)
         }
-        loadSettings()
-        window.addEventListener('storage', loadSettings)
-        return () => window.removeEventListener('storage', loadSettings)
-    }, [])
+    }, [agentsLoaded, availableAgents])
 
-    // --- Carregar Agentes Disponíveis ---
+    // --- Debounce da busca por telefone ---
     useEffect(() => {
-        const fetchAgents = async () => {
-            const { data, error } = await supabase
-                .from('info_lead')
-                .select('agent_id')
-                .not('agent_id', 'is', null)
-
-            if (!error && data) {
-                const uniqueAgents = Array.from(new Set(data.map(d => d.agent_id).filter(Boolean)))
-                setAvailableAgents(uniqueAgents)
-                if (selectedAgents.length === 0) setSelectedAgents(uniqueAgents)
-            }
-        }
-        fetchAgents()
-    }, [])
+        const t = setTimeout(() => setDebouncedPhone(phoneSearch), 500)
+        return () => clearTimeout(t)
+    }, [phoneSearch])
 
     // --- Buscar Leads ---
     const fetchLeads = async () => {
@@ -155,33 +141,34 @@ export function LeadsListView() {
                 .from('info_lead')
                 .select('*', { count: 'exact' })
 
-            // Filtro de Data
-            if (dateRange?.from) {
-                query = query.gte('created_at', dateRange.from.toISOString())
-            }
-            if (dateRange?.to) {
-                const endOfDay = new Date(dateRange.to)
-                endOfDay.setHours(23, 59, 59, 999)
-                query = query.lte('created_at', endOfDay.toISOString())
-            }
+            // Busca por telefone (server-side) — ignora outros filtros quando ativa
+            if (debouncedPhone.trim()) {
+                query = query.ilike('phone', `%${debouncedPhone.trim()}%`)
+            } else {
+                // Filtro de Data
+                if (dateRange?.from) {
+                    query = query.gte('created_at', dateRange.from.toISOString())
+                }
+                if (dateRange?.to) {
+                    const endOfDay = new Date(dateRange.to)
+                    endOfDay.setHours(23, 59, 59, 999)
+                    query = query.lte('created_at', endOfDay.toISOString())
+                }
 
-            // Filtro de Agentes
-            if (selectedAgents.length > 0) {
-                query = query.in('agent_id', selectedAgents)
+                // Filtro de Agentes
+                if (selectedAgents.length > 0) {
+                    query = query.in('agent_id', selectedAgents)
+                }
+
+                if (statusFilter === 'connected') {
+                    query = query.gt('contador_interacoes', interactionThreshold)
+                } else if (statusFilter === 'cold') {
+                    query = query.lte('contador_interacoes', interactionThreshold)
+                }
             }
 
             // ORDENAÇÃO
             query = query.order('created_at', { ascending: false })
-
-            if (statusFilter === 'connected') {
-                query = query.gt('contador_interacoes', interactionThreshold)
-            } else if (statusFilter === 'cold') {
-                query = query.lte('contador_interacoes', interactionThreshold)
-            }
-
-
-
-
 
             // PAGINAÇÃO
             const from = (currentPage - 1) * pageSize
@@ -194,32 +181,33 @@ export function LeadsListView() {
 
             const leadData = data || []
 
-            // --- Enrichment with Campaign Data ---
+            // --- Enrichment com dados de Campanha (usando .in() em vez de OR+ILIKE) ---
             const enrichedLeads = [...leadData]
             try {
-                const phones = Array.from(new Set(leadData.map(l => l.phone).filter(Boolean)))
-                if (phones.length > 0) {
-                    // Fetch latest campaign log for each phone
-                    // Selecting more columns to catch potential campaign name fields
+                const rawPhones = Array.from(new Set(leadData.map(l => l.phone).filter(Boolean))) as string[]
+                // Normaliza os telefones para busca exata (apenas dígitos)
+                const normalizedPhones = rawPhones.map(p => p.replace(/\D/g, '')).filter(Boolean)
+
+                if (normalizedPhones.length > 0) {
+                    // Busca com match exato (não usa ILIKE), muito mais rápida por usar índice
                     const { data: campaignData, error: campaignError } = await supabase
                         .from('campaign_log')
-                        .select('*')
-                        .or(phones.map(p => `phone.ilike.%${p}%`).join(','))
+                        .select('phone, utm_campaign, camping, campaign_name, utm_source, utm_medium, utm_content')
+                        .in('phone', normalizedPhones)
                         .order('created_at', { ascending: false })
+                        .limit(200)
 
                     if (!campaignError && campaignData) {
                         const campaignMap = new Map()
                         campaignData.forEach(log => {
                             const normalized = log.phone?.replace(/\D/g, '')
-                            // Only keep the most recent one (since it's ordered by created_at desc)
                             if (normalized && !campaignMap.has(normalized)) {
-                                // Try all variations of campaign field names
                                 const campaignValue =
                                     (log as any).utm_campaign ||
                                     (log as any).camping ||
                                     (log as any).campaign_name ||
                                     (log as any)["camping name"] ||
-                                    "";
+                                    ""
 
                                 campaignMap.set(normalized, {
                                     name: extractCampaignName(campaignValue),
@@ -259,12 +247,11 @@ export function LeadsListView() {
     // Refresh ao mudar filtros
     useEffect(() => {
         setCurrentPage(1)
-    }, [dateRange, selectedAgents, statusFilter])
+    }, [dateRange, selectedAgents, statusFilter, debouncedPhone])
 
     useEffect(() => {
         fetchLeads()
-    }, [currentPage, dateRange, selectedAgents, statusFilter, interactionThreshold])
-
+    }, [currentPage, dateRange, selectedAgents, statusFilter, interactionThreshold, debouncedPhone])
 
     // --- Helpers ---
     const totalPages = Math.ceil(count / pageSize)
@@ -559,9 +546,17 @@ export function LeadsListView() {
             accessorKey: "agent_id",
             header: () => <div className="text-right">Agente</div>,
             cell: ({ row }) => {
+                const agentId = row.getValue("agent_id") as string
+                const agentName = getAgentName(agentId)
+                const owner = agentOwners[agentId]
                 return (
                     <div className="flex items-center justify-end gap-2 text-sm">
-                        <span className="text-muted-foreground text-xs font-medium">{getAgentName(row.getValue("agent_id"))}</span>
+                        <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-muted-foreground text-xs font-medium">{agentName}</span>
+                            {owner && (
+                                <span className="text-[10px] text-primary/70 font-semibold">{owner}</span>
+                            )}
+                        </div>
                         <div className="bg-muted p-1 rounded-full">
                             <User className="h-3 w-3 opacity-50" />
                         </div>
@@ -569,7 +564,7 @@ export function LeadsListView() {
                 )
             }
         },
-    ], [agentNames, interactionThreshold, fetchLeads]) // Re-memoize if dependencies change
+    ], [agentNames, agentOwners, interactionThreshold, fetchLeads])
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -586,11 +581,6 @@ export function LeadsListView() {
                     <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
-
-
-
-
-
                     <div className="flex items-center bg-muted/50 p-1 rounded-lg border">
                         <Popover>
                             <PopoverTrigger asChild>
@@ -645,9 +635,10 @@ export function LeadsListView() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
-                        placeholder="Buscar por ID..."
+                        placeholder="Buscar por telefone..."
                         className="pl-9"
-                        disabled
+                        value={phoneSearch}
+                        onChange={e => setPhoneSearch(e.target.value)}
                     />
                 </div>
             </div>
@@ -660,8 +651,6 @@ export function LeadsListView() {
                     { id: 'all', label: 'Todos' },
                     { id: 'connected', label: 'Conectados' },
                     { id: 'cold', label: 'Frios' },
-
-
                 ].map(s => (
                     <button
                         key={s.id}

@@ -1,12 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import dynamic from "next/dynamic"
-
-const LeadsAreaChart = dynamic(
-    () => import("@/components/leads-area-chart").then((mod) => mod.LeadsAreaChart),
-    { ssr: false }
-)
+import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { LeadsListView } from "@/components/leads-list-view"
 import { SettingsView } from "@/components/settings-view"
@@ -16,10 +10,11 @@ import { AgentesView } from "@/components/agentes-view"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { cn } from "@/lib/utils"
 
 import { DashboardAdventure } from "@/components/dashboard-adventure"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { DashboardProvider } from "@/lib/dashboard-context"
 
 export default function Home() {
     const { data: session, status } = useSession()
@@ -44,49 +39,55 @@ export default function Home() {
     }
 
     return (
-        <div className="flex min-h-screen bg-background">
-            {/* Sidebar Fixa */}
-            <div className={`sticky top-0 h-screen z-40 flex-none hidden md:block transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"}`}>
-                <Sidebar
-                    activeView={currentView}
-                    onViewChange={setCurrentView}
-                    isCollapsed={isCollapsed}
-                    toggleSidebar={() => setIsCollapsed(!isCollapsed)}
-                />
+        <DashboardProvider>
+        <>
+            <div className="flex min-h-screen bg-background">
+                {/* Sidebar Fixa — desktop only */}
+                <div className={`sticky top-0 h-screen z-40 flex-none hidden md:block transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"}`}>
+                    <Sidebar
+                        activeView={currentView}
+                        onViewChange={setCurrentView}
+                        isCollapsed={isCollapsed}
+                        toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+                    />
+                </div>
+
+                {/* Conteúdo Principal */}
+                <main className={cn(
+                    "flex-1 w-full transition-all duration-300",
+                    currentView === "dashboard" ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto pb-20 md:pb-0"
+                )}>
+                    <div className={cn(
+                        "container mx-auto max-w-[1600px]",
+                        currentView === "dashboard" ? "p-0 h-full" : "p-4 md:p-8 space-y-8"
+                    )}>
+
+                        {currentView === "dashboard" && <DashboardAdventure />}
+
+                        {currentView === "leads" && <LeadsListView />}
+
+                        {currentView === "settings" && (session?.user as any)?.role === 'admin' ? (
+                            <SettingsView />
+                        ) : currentView === "settings" ? (
+                            <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+                                <p className="text-muted-foreground">Você não tem permissão para acessar esta área.</p>
+                                <Button onClick={() => setCurrentView("dashboard")}>Voltar ao Dashboard</Button>
+                            </div>
+                        ) : null}
+
+                        {currentView === "updates" && <UpdatesView />}
+
+                        {currentView === "agentes" && <AgentesView />}
+
+                        {currentView === "help" && <HelpView />}
+
+                    </div>
+                </main>
             </div>
 
-            {/* Conteúdo Principal */}
-            <main className={cn(
-                "flex-1 w-full transition-all duration-300",
-                currentView === "dashboard" ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
-            )}>
-                <div className={cn(
-                    "container mx-auto max-w-[1600px]",
-                    currentView === "dashboard" ? "p-0 h-full" : "p-6 md:p-8 space-y-8"
-                )}>
-
-
-                    {currentView === "dashboard" && <DashboardAdventure />}
-
-                    {currentView === "leads" && <LeadsListView />}
-
-                    {currentView === "settings" && (session?.user as any)?.role === 'admin' ? (
-                        <SettingsView />
-                    ) : currentView === "settings" ? (
-                        <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
-                            <p className="text-muted-foreground">Você não tem permissão para acessar esta área.</p>
-                            <Button onClick={() => setCurrentView("dashboard")}>Voltar ao Dashboard</Button>
-                        </div>
-                    ) : null}
-
-                    {currentView === "updates" && <UpdatesView />}
-
-                    {currentView === "agentes" && <AgentesView />}
-
-                    {currentView === "help" && <HelpView />}
-
-                </div>
-            </main>
-        </div>
+            {/* Navegação mobile — visível apenas em telas pequenas */}
+            <MobileBottomNav activeView={currentView} onViewChange={setCurrentView} />
+        </>
+        </DashboardProvider>
     )
 }

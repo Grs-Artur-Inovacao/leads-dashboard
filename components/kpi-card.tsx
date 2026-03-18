@@ -17,6 +17,8 @@ interface KpiCardProps {
     icon?: React.ReactNode
     isPlaceholder?: boolean
     chart?: React.ReactNode // New prop for a detailed chart
+    goalLabel?: string // Optional custom label for the goal box
+    showReferencePoints?: boolean // Whether to show scale points in the chart
 }
 
 export function KpiCard({
@@ -29,7 +31,9 @@ export function KpiCard({
     description,
     icon,
     chart,
-    isPlaceholder = false
+    isPlaceholder = false,
+    goalLabel = "Meta",
+    showReferencePoints = false
 }: KpiCardProps) {
     // Calcular porcentagem da meta principal
     const numericGoal = typeof goal === 'number' ? goal : 0
@@ -68,7 +72,7 @@ export function KpiCard({
                     {/* Header: Title and Goal Box */}
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold tracking-tight text-foreground/80 uppercase">{title}</h3>
+                            <h3 className="text-lg font-semibold tracking-tight text-foreground/80 uppercase">{title}</h3>
                             {description && (
                                 <div title={description} className="cursor-help">
                                     <HelpCircle className="h-4 w-4 text-muted-foreground/50" />
@@ -83,35 +87,36 @@ export function KpiCard({
                                 isGoalMet && !isPlaceholder ? "border-emerald-500/30 bg-emerald-500/5" : "border-muted"
                             )}>
                                 <span className={cn(
-                                    "text-sm font-bold",
+                                    "text-lg font-black",
                                     isGoalMet && !isPlaceholder ? "text-emerald-600" : "text-muted-foreground"
                                 )}>
                                     {isPlaceholder ? "..." : `${goalPercentage.toFixed(1)}%`}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground uppercase font-semibold">
-                                    Meta: {isPlaceholder ? "..." : goal}
+                                <span className="text-[12px] text-muted-foreground uppercase font-bold">
+                                    {goalLabel}: {isPlaceholder ? "..." : goal}
                                 </span>
                             </div>
                         )}
                     </div>
 
-                    {/* Main Value */}
-                    <div className="mt-2">
-                        <span className="text-5xl font-extrabold tracking-tighter text-foreground">
+                    {/* Unified Value and Growth Area */}
+                    <div className="mt-2 flex items-baseline gap-4 whitespace-nowrap overflow-visible">
+                        <span className="text-7xl font-black tracking-tighter text-foreground leading-none">
                             {isPlaceholder ? "..." : value}
                         </span>
 
-                    </div>
-
-                    {/* Growth Indicator */}
-                    <div className="flex items-center mt-2 gap-2">
-                        <div className={cn("flex items-center text-sm font-semibold", isPlaceholder ? "text-muted-foreground" : growthColor)}>
-                            {isPlaceholder ? <MinusIcon className="h-4 w-4 mr-1" /> : <GrowthIcon className="h-4 w-4 mr-1" />}
-                            {isPlaceholder ? "..." : growthLabel}
+                        <div className={cn(
+                            "flex items-center gap-1.5",
+                            isPlaceholder ? "text-muted-foreground" : growthColor
+                        )}>
+                            <div className="flex items-center">
+                                {isPlaceholder ? <MinusIcon className="h-5 w-5" /> : <GrowthIcon className="h-5 w-5" />}
+                                <span className="text-xl font-black ml-0.5">{isPlaceholder ? "..." : growthLabel}</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground font-semibold">
+                                vs. período anterior
+                            </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                            vs. período anterior
-                        </span>
                     </div>
                 </div>
 
@@ -125,18 +130,18 @@ export function KpiCard({
                 {/* Secondary Metric (Middle Section) */}
                 {secondaryMetric && (
                     <div className="mt-6 py-3 border-t border-dashed border-muted-foreground/30">
-                        <p className="text-xs text-muted-foreground uppercase font-medium mb-1">
+                        <p className="text-sm text-muted-foreground uppercase font-bold mb-1">
                             {secondaryMetric.label}
                         </p>
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-baseline gap-2">
-                                <span className="text-xl font-bold text-foreground/90">
+                                <span className="text-3xl font-black text-foreground/90">
                                     {isPlaceholder ? "..." : secondaryMetric.value}
                                 </span>
 
                                 {(secondaryMetric.goal !== undefined || isPlaceholder) && (
                                     <span className={cn(
-                                        "text-xs font-medium px-2 py-0.5 rounded-full border",
+                                        "text-base font-bold px-3 py-1 rounded-full border",
                                         "bg-muted/50 text-muted-foreground border-muted-foreground/20"
                                     )}>
                                         {isPlaceholder ? "Meta: ..." : `Meta: ${secondaryMetric.goal}%`}

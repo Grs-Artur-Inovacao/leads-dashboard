@@ -67,37 +67,54 @@ export default function ScrollAdventure({ children, className, pageLabels, autoP
                 ))}
             </div>
 
-            {/* Rodapé / Indicador de Página */}
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50">
-                {/* Dots / Navegação */}
-                <div className="flex items-center gap-4 bg-white/5 backdrop-blur-md px-4 py-3 rounded-full border border-white/10">
-                    {children.map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => scrollToPage(index)}
-                            className={cn(
-                                "w-2.5 h-2.5 rounded-full transition-all duration-500 relative bg-white/10 overflow-hidden",
-                                activeIndex === index ? "w-8" : "hover:bg-white/30"
-                            )}
-                            aria-label={`Ir para página ${index + 1}`}
-                        >
-                            {activeIndex === index && (
-                                <motion.div
-                                    key={activeIndex}
-                                    layoutId="indicator"
-                                    className="absolute inset-0 bg-white"
-                                    initial={{ scaleX: 0 }}
-                                    animate={{ scaleX: 1 }}
-                                    transition={{
-                                        duration: (autoPlayInterval / 1000),
-                                        ease: "linear"
-                                    }}
-                                    style={{ originX: 0 }}
-                                />
-                            )}
-                        </button>
-                    ))}
-                </div>
+            {/* Indicador de Página (Barra de Progresso Superior) — Somente Desktop */}
+            <div className="absolute top-0 left-0 right-0 z-50 hidden md:flex h-1 gap-1 px-1">
+                {children.map((_, index) => (
+                    <div
+                        key={index}
+                        className="flex-1 overflow-hidden rounded-full bg-white/5 backdrop-blur-md cursor-pointer group/bar h-full"
+                        onClick={() => scrollToPage(index)}
+                    >
+                        <div className="absolute inset-0 bg-white/10 group-hover/bar:bg-white/20 transition-colors" />
+                        {activeIndex === index && (
+                            <motion.div
+                                key={activeIndex}
+                                layoutId="indicator"
+                                className="h-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+                                initial={{ scaleX: 0 }}
+                                animate={{ scaleX: 1 }}
+                                transition={{
+                                    duration: (autoPlayInterval / 1000),
+                                    ease: "linear"
+                                }}
+                                style={{ originX: 0 }}
+                            />
+                        )}
+                        {/* Label flutuante ao passar o mouse */}
+                        {pageLabels && pageLabels[index] && (
+                            <div className="absolute top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap">
+                                <span className="bg-zinc-900/90 text-[10px] font-black uppercase tracking-widest text-white px-3 py-1 rounded-full border border-white/10">
+                                    {pageLabels[index]}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div
+                ref={containerRef}
+                onScroll={handleScroll}
+                className={cn("w-full h-full overflow-y-auto snap-y snap-mandatory no-scrollbar scroll-smooth", className)}
+            >
+                {children.map((child, index) => (
+                    <section
+                        key={index}
+                        className="w-full h-screen snap-start snap-always relative overflow-hidden"
+                    >
+                        {child}
+                    </section>
+                ))}
             </div>
         </div>
     );

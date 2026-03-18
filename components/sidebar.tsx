@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Bell, LogOut, ChevronsUpDown, Megaphone } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, BarChart3, HelpCircle, ChevronLeft, ChevronRight, Bell, LogOut, ChevronsUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSession, signOut } from "next-auth/react"

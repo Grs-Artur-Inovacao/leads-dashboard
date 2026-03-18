@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { motion } from "framer-motion"
-import { Loader2, Bell, Sparkles } from "lucide-react"
+import { Loader2, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardDescription, CardHeader, CardTitle, CardFooter, CardAction } from "@/components/ui/card"
@@ -20,8 +20,6 @@ import {
 import { supabase } from "@/lib/supabaseClient"
 import { cn } from "@/lib/utils"
 
-import { DisplayCards } from "@/components/ui/display-cards"
-
 interface UpdateItem {
     id: string
     version: string
@@ -32,18 +30,6 @@ interface UpdateItem {
     release_date: string
     theme_color?: string // New field for customization
 }
-
-const stackStyles = [
-    {
-        className: "[grid-area:stack] hover:-translate-y-10 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration:700 hover:grayscale-0 before:left-0 before:top-0",
-    },
-    {
-        className: "[grid-area:stack] translate-x-16 translate-y-10 hover:-translate-y-1 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration:700 hover:grayscale-0 before:left-0 before:top-0",
-    },
-    {
-        className: "[grid-area:stack] translate-x-32 translate-y-20 hover:translate-y-10",
-    },
-];
 
 export function UpdatesView() {
     const [updates, setUpdates] = useState<UpdateItem[]>([])
@@ -145,8 +131,7 @@ export function UpdatesView() {
         )
     }
 
-    const featuredUpdates = updates.slice(0, 3)
-    const otherUpdates = updates.slice(3)
+
 
     return (
         <div className="container max-w-6xl mx-auto py-10 space-y-12 animate-in fade-in duration-500">
@@ -216,31 +201,6 @@ export function UpdatesView() {
                 </div>
             )}
 
-            {/* Floating Destaques Section (Bottom Right) */}
-            {featuredUpdates.length > 0 && (
-                <div className="fixed bottom-10 right-10 z-[100] scale-[0.7] transform-gpu transition-all hover:scale-[0.8] origin-bottom-right pointer-events-none hover:rotate-2">
-                    <div className="pointer-events-auto cursor-pointer flex flex-col items-center group">
-                        <div className="mb-4 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold border border-muted text-muted-foreground uppercase tracking-widest">
-                            Novidades Recentes
-                        </div>
-                        <DisplayCards
-                            cards={featuredUpdates.map((update, index) => {
-                                const colors = getColorClasses(update.theme_color)
-                                return {
-                                    title: update.title,
-                                    description: update.summary,
-                                    date: update.version,
-                                    className: stackStyles[index]?.className || stackStyles[stackStyles.length - 1].className,
-                                    icon: <Sparkles className={cn("size-4", colors.icon)} />,
-                                    titleClassName: colors.title,
-                                    iconBgClassName: colors.iconBg,
-                                    onClick: () => setSelectedUpdate(update)
-                                }
-                            })}
-                        />
-                    </div>
-                </div>
-            )}
 
             <Drawer open={!!selectedUpdate} onOpenChange={(open) => !open && setSelectedUpdate(null)}>
                 <DrawerContent className="max-h-[85vh]">

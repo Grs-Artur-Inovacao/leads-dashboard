@@ -12,6 +12,7 @@ export interface DashboardSettings {
     monthly_msg_target: number
     lifetime_msg_milestone: number
     agent_names: Record<string, string>
+    agent_owners: Record<string, string>
 }
 
 // Default settings
@@ -24,7 +25,8 @@ export const DEFAULT_SETTINGS: DashboardSettings = {
     daily_msg_target: 20,
     monthly_msg_target: 500,
     lifetime_msg_milestone: 5000,
-    agent_names: {}
+    agent_names: {},
+    agent_owners: {}
 }
 
 export const settingsService = {
