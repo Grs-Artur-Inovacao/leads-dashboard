@@ -39,7 +39,19 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
         { id: "help", label: "Ajuda", icon: HelpCircle },
     ]
 
-    const filteredBottomItems = bottomItems.filter(item => !item.adminOnly || (user as any)?.role === 'admin')
+    const userRole = ((user as any)?.role || 'user').toLowerCase()
+    const isReader = userRole === 'reader'
+
+    const filteredMenuItems = menuItems.filter(item => {
+        if (isReader) return item.id === 'leads'
+        return true
+    })
+
+    const filteredBottomItems = bottomItems.filter(item => {
+        if (item.adminOnly && userRole !== 'admin') return false;
+        if (isReader && item.id !== 'help') return false;
+        return true;
+    })
 
     return (
         <aside className={cn(
@@ -84,7 +96,7 @@ export function Sidebar({ activeView, onViewChange, isCollapsed, toggleSidebar }
                         </h2>
                     )}
                     <nav className="space-y-1">
-                        {menuItems.map((item) => (
+                        {filteredMenuItems.map((item) => (
                             <Button
                                 key={item.id}
                                 variant={activeView === item.id ? "secondary" : "ghost"}

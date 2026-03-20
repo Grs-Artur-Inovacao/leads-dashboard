@@ -383,8 +383,9 @@ function UserWhitelistManager() {
 
             if (error) throw error
             setUsers(users.map(u => u.email === email ? { ...u, role: newRole } : u))
-        } catch (err) {
+        } catch (err: any) {
             console.error("Erro ao atualizar role:", err)
+            alert("Não foi possível trocar o cargo. Talvez falte permissão no banco de dados para a role 'reader': " + (err.message || JSON.stringify(err)))
         }
     }
 
@@ -434,6 +435,7 @@ function UserWhitelistManager() {
                                     className="bg-transparent border-none text-xs focus:ring-0 cursor-pointer text-muted-foreground hover:text-foreground"
                                 >
                                     <option value="user">User</option>
+                                    <option value="reader">Reader</option>
                                     <option value="manager">Manager</option>
                                     <option value="admin">Admin</option>
                                 </select>

@@ -486,35 +486,40 @@ export function LeadsListView() {
                                                 Salesforce
                                             </Badge>
                                         ) : (
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button size="sm" variant="outline" className="h-8 gap-2 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary">
-                                                        <UserPlus className="h-3.5 w-3.5" />
-                                                        Qualificar como MQL
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Qualificar Lead (MQL)</DialogTitle>
-                                                        <DialogDescription>
-                                                            Preencha os dados do lead para cadastrá-lo como MQL no Salesforce.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <LeadRegistrationForm
-                                                        initialData={{
-                                                            leadId: lead.id,
-                                                            firstName: lead.first_name,
-                                                            lastName: lead.last_name,
-                                                            phone: lead.phone,
-                                                            company: lead.company,
-                                                            interest: lead.product,
-                                                            email: lead.email,
-                                                            cnpj: lead.cnpj
-                                                        }}
-                                                        onSuccess={() => fetchLeads()}
-                                                    />
-                                                </DialogContent>
-                                            </Dialog>
+                                            <>
+                                                {/* Formulários de qualificação de leads (MQL) ocultos temporariamente */}
+                                                {/* Ver AI_INSTRUCTIONS/HIDDEN_LEAD_QUALIFICATION_FORM.md para mais detalhes sobre como reativá-los
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button size="sm" variant="outline" className="h-8 gap-2 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary">
+                                                            <UserPlus className="h-3.5 w-3.5" />
+                                                            Qualificar como MQL
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Qualificar Lead (MQL)</DialogTitle>
+                                                            <DialogDescription>
+                                                                Preencha os dados do lead para cadastrá-lo como MQL no Salesforce.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <LeadRegistrationForm
+                                                            initialData={{
+                                                                leadId: lead.id,
+                                                                firstName: lead.first_name,
+                                                                lastName: lead.last_name,
+                                                                phone: lead.phone,
+                                                                company: lead.company,
+                                                                interest: lead.product,
+                                                                email: lead.email,
+                                                                cnpj: lead.cnpj
+                                                            }}
+                                                            onSuccess={() => fetchLeads()}
+                                                        />
+                                                    </DialogContent>
+                                                </Dialog>
+                                                */}
+                                            </>
                                         )}
                                     </div>
                                 </div>

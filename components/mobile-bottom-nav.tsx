@@ -12,15 +12,24 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ activeView, onViewChange }: MobileBottomNavProps) {
     const { data: session } = useSession()
     const user = session?.user
-    const isAdmin = (user as any)?.role === 'admin'
+    const userRole = ((user as any)?.role || '').toLowerCase()
+    const isAdmin = userRole === 'admin'
+    const isReader = userRole === 'reader'
 
-    const items = [
+    let items = [
         { id: "dashboard", label: "Início", icon: LayoutDashboard },
         { id: "leads", label: "Leads", icon: Users },
         { id: "agentes", label: "Agentes", icon: FileText },
         { id: "updates", label: "Updates", icon: Bell },
         ...(isAdmin ? [{ id: "settings", label: "Config", icon: Settings }] : [{ id: "help", label: "Ajuda", icon: HelpCircle }]),
     ]
+
+    if (isReader) {
+        items = [
+            { id: "leads", label: "Leads", icon: Users },
+            { id: "help", label: "Ajuda", icon: HelpCircle },
+        ]
+    }
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t bg-card/95 backdrop-blur-lg">

@@ -21,18 +21,20 @@ export default function Home() {
     const router = useRouter()
     const [currentView, setCurrentView] = useState("dashboard")
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const userRole = ((session?.user as any)?.role || '').toLowerCase()
 
     useEffect(() => {
         if (status === 'authenticated') {
-            const userRole = (session?.user as any)?.role
             const hasAccess = (session?.user as any)?.hasAccess
 
             // Admin sempre tem acesso, outros verificamos a flag hasAccess da tabela
             if (userRole !== 'admin' && !hasAccess) {
                 router.push('/unauthorized')
+            } else if (userRole === 'reader' && currentView !== 'leads' && currentView !== 'help') {
+                setCurrentView('leads')
             }
         }
-    }, [session, status, router])
+    }, [session, status, router, currentView])
 
     if (status === 'loading') {
         return <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-white">Carregando...</div>
@@ -62,22 +64,22 @@ export default function Home() {
                         currentView === "dashboard" ? "p-0 h-full" : "p-4 md:p-8 space-y-8"
                     )}>
 
-                        {currentView === "dashboard" && <DashboardAdventure />}
+                        {currentView === "dashboard" && userRole !== 'reader' && <DashboardAdventure />}
 
                         {currentView === "leads" && <LeadsListView />}
 
-                        {currentView === "settings" && (session?.user as any)?.role === 'admin' ? (
+                        {currentView === "settings" && userRole === 'admin' ? (
                             <SettingsView />
                         ) : currentView === "settings" ? (
                             <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
                                 <p className="text-muted-foreground">Você não tem permissão para acessar esta área.</p>
-                                <Button onClick={() => setCurrentView("dashboard")}>Voltar ao Dashboard</Button>
+                                <Button onClick={() => setCurrentView(userRole === 'reader' ? 'leads' : 'dashboard')}>Voltar</Button>
                             </div>
                         ) : null}
 
-                        {currentView === "updates" && <UpdatesView />}
+                        {currentView === "updates" && userRole !== 'reader' && <UpdatesView />}
 
-                        {currentView === "agentes" && <AgentesView />}
+                        {currentView === "agentes" && userRole !== 'reader' && <AgentesView />}
 
                         {currentView === "help" && <HelpView />}
 
