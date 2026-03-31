@@ -156,16 +156,31 @@ export function ConversationsAnalysis() {
 
             setKpis({ today: todayRes.count || 0, month: monthRes.count || 0, lifetime: 0, todayPrev: yesterdayRes.count || 0, monthPrev: prevMonthRes.count || 0, totalPeriod: totalRes.count || 0 })
 
-            let leadsQuery = supabase.from('info_lead').select('created_at, contador_interacoes, agent_id').order('created_at', { ascending: false }).limit(2000)
-            if (fromDate && toDate) leadsQuery = leadsQuery.gte('created_at', monthStart).lte('created_at', monthEnd)
-            if (selectedAgents.length > 0) leadsQuery = leadsQuery.in('agent_id', selectedAgents)
+            // Paginação para leads (horários + daily)
+            let allLeadsData: any[] = []
+            let leadsPage = 0
+            const PAGE_SIZE = 1000
+            let leadsHasMore = true
 
-            const { data: leadsData } = await leadsQuery
+            while (leadsHasMore) {
+                let leadsQuery = supabase.from('info_lead').select('created_at, contador_interacoes, agent_id').order('created_at', { ascending: false }).range(leadsPage * PAGE_SIZE, (leadsPage + 1) * PAGE_SIZE - 1)
+                if (fromDate && toDate) leadsQuery = leadsQuery.gte('created_at', monthStart).lte('created_at', monthEnd)
+                if (selectedAgents.length > 0) leadsQuery = leadsQuery.in('agent_id', selectedAgents)
+                const { data } = await leadsQuery
+                if (data && data.length > 0) {
+                    allLeadsData = [...allLeadsData, ...data]
+                    leadsHasMore = data.length === PAGE_SIZE
+                    leadsPage++
+                } else {
+                    leadsHasMore = false
+                }
+            }
+
             const hours: any = {}
             for (let i = 0; i < 24; i++) hours[i] = { hour: i.toString().padStart(2, '0') + ':00', messages: 0, connected: 0 }
             const dailyData: Record<string, { connected: number, total: number }> = {}
 
-            leadsData?.forEach(lead => {
+            allLeadsData.forEach(lead => {
                 const dateObj = new Date(lead.created_at)
                 if (isNaN(dateObj.getTime())) return
                 const hour = dateObj.getHours(), interactions = lead.contador_interacoes || 0
@@ -177,14 +192,28 @@ export function ConversationsAnalysis() {
             setHourlyData(Object.values(hours))
             setDailyKpis(Object.entries(dailyData).sort(([a], [b]) => a.localeCompare(b)).map(([date, counts]) => ({ date, ...counts })))
 
-            let geoQuery = supabase.from('info_lead').select('phone, contador_interacoes, agent_id').order('created_at', { ascending: false }).limit(2000)
-            if (fromDate && toDate) geoQuery = geoQuery.gte('created_at', monthStart).lte('created_at', monthEnd)
-            if (selectedAgents.length > 0) geoQuery = geoQuery.in('agent_id', selectedAgents)
+            // Paginação para geo
+            let allGeoData: any[] = []
+            let geoPage = 0
+            let geoHasMore = true
 
-            const { data: geoData } = await geoQuery
+            while (geoHasMore) {
+                let geoQuery = supabase.from('info_lead').select('phone, contador_interacoes, agent_id').order('created_at', { ascending: false }).range(geoPage * PAGE_SIZE, (geoPage + 1) * PAGE_SIZE - 1)
+                if (fromDate && toDate) geoQuery = geoQuery.gte('created_at', monthStart).lte('created_at', monthEnd)
+                if (selectedAgents.length > 0) geoQuery = geoQuery.in('agent_id', selectedAgents)
+                const { data } = await geoQuery
+                if (data && data.length > 0) {
+                    allGeoData = [...allGeoData, ...data]
+                    geoHasMore = data.length === PAGE_SIZE
+                    geoPage++
+                } else {
+                    geoHasMore = false
+                }
+            }
+
             const countsMap: Record<string, { total: number, connected: number }> = {}
             let totalPhones = 0
-            geoData?.forEach(lead => {
+            allGeoData.forEach(lead => {
                 if (!lead.phone) return
                 const phoneDigits = lead.phone.replace(/\D/g, ''), ddd = phoneDigits.startsWith('55') ? phoneDigits.substring(2, 4) : phoneDigits.substring(0, 2), state = DDD_TO_STATE[ddd] || 'Outros'
                 if (!countsMap[state]) countsMap[state] = { total: 0, connected: 0 }
@@ -212,11 +241,11 @@ export function ConversationsAnalysis() {
     const chartConfig = { messages: { label: "Iniciaram Conversa", color: "#3b82f6" }, connected: { label: "Leads Conectados", color: "#10b981" } } satisfies ChartConfig
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-2xl font-bold tracking-tight">Análise de Engajamento</h2>
-                    <p className="text-muted-foreground text-sm">Visão detalhada do volume de interações e comportamento temporal.</p>
+        <div className="flex flex-col h-full gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
+                <div className="flex flex-col gap-0.5">
+                    <h2 className="text-lg font-bold tracking-tight">Análise de Engajamento</h2>
+                    <p className="text-muted-foreground text-xs">Visão detalhada do volume de interações e comportamento temporal.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Popover>
@@ -227,19 +256,19 @@ export function ConversationsAnalysis() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3 flex-shrink-0">
                 <KpiCard title="Conectados Hoje" value={kpis.today} currentValue={kpis.today} previousValue={kpis.todayPrev} goal={calculatedDailyGoal} description="Leads que atingiram o limiar de engajamento nas últimas 24 horas." icon={<MessageSquare className="h-5 w-5" />} secondaryMetric={{ label: "Taxa Diária", value: kpis.today > 0 ? "Ativo" : "Pendente" }} />
                 <KpiCard title={date?.from ? "Conectados no Período" : "Conectados no Mês"} value={kpis.month} currentValue={kpis.month} previousValue={kpis.monthPrev} goal={calculatedMonthlyGoal} description={date?.from ? "Volume de leads qualificados no período selecionado." : "Volume de leads qualificados no mês atual."} icon={<CalendarIcon className="h-5 w-5" />} secondaryMetric={{ label: "Evolução Conexões", value: `${((kpis.month / (kpis.totalPeriod || 1)) * 100).toFixed(1)}%` }} />
                 <KpiCard title={date?.from ? "Leads no Período" : "Total de Leads (Geral)"} value={kpis.totalPeriod} goal={0} goalLabel="Meta" currentValue={kpis.totalPeriod} description={date?.from ? `Soma de todos os leads recebidos no período selecionado pelo ${agentLabel}.` : `Soma histórica de todos os leads recebidos pelo ${agentLabel}.`} icon={<Users className="h-5 w-5" />} secondaryMetric={{ label: "Fluxo de Leads", value: "Volume" }} />
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <Card className="shadow-lg border-muted xl:col-span-2 flex flex-col">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 flex-1 min-h-0">
+                <Card className="shadow-lg border-muted xl:col-span-2 flex flex-col min-h-0">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 flex-shrink-0">
                         <CardTitle className="text-lg font-semibold tracking-tight text-foreground/80 uppercase">Horários de Pico</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 flex flex-col pt-2">
-                        <ChartContainer config={chartConfig} className="aspect-auto h-[400px] w-full">
+                    <CardContent className="flex-1 flex flex-col pt-2 min-h-0">
+                        <ChartContainer config={chartConfig} className="aspect-auto flex-1 min-h-0 w-full">
                             <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.1} />
                                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
@@ -250,14 +279,14 @@ export function ConversationsAnalysis() {
                                 <Bar dataKey="connected" name="Conectados" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
                             </BarChart>
                         </ChartContainer>
-                        <div className="mt-auto pt-3 border-t border-primary/20">
+                        <div className="mt-auto pt-2 border-t border-primary/20 flex-shrink-0">
                             <p className="text-xs text-muted-foreground italic leading-relaxed text-center">Identificação dos momentos de maior atividade, analisando o comportamento temporal dos leads.</p>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-lg border-muted xl:col-span-1 flex flex-col">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                <Card className="shadow-lg border-muted xl:col-span-1 flex flex-col min-h-0">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 flex-shrink-0">
                         <CardTitle className="text-lg font-semibold tracking-tight text-foreground/80 uppercase">Origem dos Leads</CardTitle>
                         <Dialog>
                             <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><ExternalLink className="h-4 w-4" /></Button></DialogTrigger>
@@ -272,8 +301,8 @@ export function ConversationsAnalysis() {
                             </DialogContent>
                         </Dialog>
                     </CardHeader>
-                    <CardContent className="flex-1 flex flex-col gap-6">
-                        <div className="space-y-4">
+                    <CardContent className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-3">
                             {stateDistribution.slice(0, 10).map((i, idx) => (
                                 <div key={i.state} className="group flex flex-col gap-1">
                                     <div className="flex items-center justify-between text-sm">
@@ -284,7 +313,7 @@ export function ConversationsAnalysis() {
                                 </div>
                             ))}
                         </div>
-                        <div className="mt-auto pt-3 border-t border-primary/20">
+                        <div className="mt-auto pt-2 border-t border-primary/20 flex-shrink-0">
                             <p className="text-xs text-muted-foreground italic leading-relaxed text-center">Distribuição por Estado (UF) {stateDistribution.length > 10 ? `— E mais ${stateDistribution.length - 10} estados detectados.` : ''}</p>
                         </div>
                     </CardContent>

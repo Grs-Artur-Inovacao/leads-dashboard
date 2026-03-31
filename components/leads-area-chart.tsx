@@ -82,6 +82,7 @@ export function LeadsAreaChart() {
     const [date, setDate] = useState<DateRange | undefined>(undefined)
     const [metricType, setMetricType] = useState<"total" | "connected" | "comparison">("comparison")
     const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([])
+    const [campaignLeadMap, setCampaignLeadMap] = useState<Map<string, { isLead: boolean, isConnected: boolean }>>(new Map())
     const [campaignLoading, setCampaignLoading] = useState(false)
     const [kpis, setKpis] = useState({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 })
     const [previousKpis, setPreviousKpis] = useState({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 })
@@ -135,13 +136,66 @@ export function LeadsAreaChart() {
             const toDate = date?.to || new Date()
             const queryEndDate = new Date(toDate)
             queryEndDate.setHours(23, 59, 59, 999)
-            const { data, error } = await supabase.from('campaign_log').select('*').gte('created_at', fromDate.toISOString()).lte('created_at', queryEndDate.toISOString()).order('created_at', { ascending: false }).limit(1000)
-            if (error) throw error
-            const enrichedLogs = data.map(log => {
+
+            // Paginação: buscar todos os registros em batches de 1000
+            let allData: any[] = []
+            let page = 0
+            const PAGE_SIZE = 1000
+            let hasMore = true
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('campaign_log')
+                    .select('*')
+                    .gte('created_at', fromDate.toISOString())
+                    .lte('created_at', queryEndDate.toISOString())
+                    .order('created_at', { ascending: false })
+                    .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+                if (error) throw error
+                if (data && data.length > 0) {
+                    allData = [...allData, ...data]
+                    hasMore = data.length === PAGE_SIZE
+                    page++
+                } else {
+                    hasMore = false
+                }
+            }
+
+            const enrichedLogs = allData.map(log => {
                 const campaignValue = log.utm_campaign || log.camping || log.campaign_name || log["camping name"] || ""
                 return { ...log, display_campaign: extractCampaignName(campaignValue) }
             })
             setCampaignLogs(enrichedLogs)
+
+            // Cross-reference: buscar info_lead para os telefones das campanhas
+            const uniquePhones = [...new Set(enrichedLogs.map(l => l.phone).filter(Boolean))]
+            const leadMap = new Map<string, { isLead: boolean, isConnected: boolean }>()
+
+            if (uniquePhones.length > 0) {
+                // Buscar em batches de 100 phones (limite do filtro IN do Supabase)
+                const PHONE_BATCH = 100
+                for (let i = 0; i < uniquePhones.length; i += PHONE_BATCH) {
+                    const phoneBatch = uniquePhones.slice(i, i + PHONE_BATCH)
+                    const { data: leadData } = await supabase
+                        .from('info_lead')
+                        .select('phone, contador_interacoes')
+                        .in('phone', phoneBatch)
+
+                    leadData?.forEach(lead => {
+                        if (lead.phone) {
+                            const existing = leadMap.get(lead.phone)
+                            const isConnected = (lead.contador_interacoes || 0) > interactionThreshold
+                            if (existing) {
+                                existing.isConnected = existing.isConnected || isConnected
+                            } else {
+                                leadMap.set(lead.phone, { isLead: true, isConnected })
+                            }
+                        }
+                    })
+                }
+            }
+            setCampaignLeadMap(leadMap)
         } catch (error) {
             console.error("Erro ao buscar logs de campanha:", error)
         } finally {
@@ -150,12 +204,20 @@ export function LeadsAreaChart() {
     }
 
     const campaignChartData = useMemo(() => {
-        const counts: Record<string, number> = {}
+        const counts: Record<string, { contacts: number, leads: number, connected: number }> = {}
         campaignLogs.forEach(log => {
-            if (log.display_campaign) counts[log.display_campaign] = (counts[log.display_campaign] || 0) + 1
+            if (!log.display_campaign) return
+            if (!counts[log.display_campaign]) counts[log.display_campaign] = { contacts: 0, leads: 0, connected: 0 }
+            counts[log.display_campaign].contacts++
+            const phoneInfo = log.phone ? campaignLeadMap.get(log.phone) : undefined
+            if (phoneInfo?.isLead) counts[log.display_campaign].leads++
+            if (phoneInfo?.isConnected) counts[log.display_campaign].connected++
         })
-        return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8)
-    }, [campaignLogs])
+        return Object.entries(counts)
+            .map(([name, data]) => ({ name, ...data }))
+            .sort((a, b) => b.contacts - a.contacts)
+            .slice(0, 8)
+    }, [campaignLogs, campaignLeadMap])
 
     useEffect(() => {
         if (agentsLoaded && availableAgents.length > 0 && selectedAgents.length === 0) setSelectedAgents(availableAgents)
@@ -173,22 +235,44 @@ export function LeadsAreaChart() {
             const previousFromDate = subDays(fromDate, durationInDays)
             const previousToDate = subDays(queryEndDate, durationInDays)
 
-            let query = supabase.from('info_lead').select('created_at, agent_id, contador_interacoes, is_mql').order('created_at', { ascending: true }).gte('created_at', fromDate.toISOString()).lte('created_at', queryEndDate.toISOString())
-            let previousQuery = supabase.from('info_lead').select('created_at, agent_id, contador_interacoes, is_mql').gte('created_at', previousFromDate.toISOString()).lte('created_at', previousToDate.toISOString())
+            const agentFilter = selectedAgents.length > 0 ? selectedAgents : null
 
-            if (selectedAgents.length > 0) {
-                query = query.in('agent_id', selectedAgents)
-                previousQuery = previousQuery.in('agent_id', selectedAgents)
-            } else {
+            if (!agentFilter) {
                 setChartData([]); setKpis({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 }); setPreviousKpis({ totalLeads: 0, connectedLeads: 0, mqlLeads: 0, avgConnectivity: 0 }); setLoading(false); return
             }
 
-            const [currentResult, previousResult] = await Promise.all([query, previousQuery])
-            if (currentResult.error) throw currentResult.error
-            if (previousResult.error) throw previousResult.error
+            // Helper de paginação
+            const fetchAllPages = async (buildQuery: (page: number, pageSize: number) => any) => {
+                let allData: any[] = []
+                let page = 0
+                const PAGE_SIZE = 1000
+                let hasMore = true
+                while (hasMore) {
+                    const result = await buildQuery(page, PAGE_SIZE)
+                    if (result.error) throw result.error
+                    if (result.data && result.data.length > 0) {
+                        allData = [...allData, ...result.data]
+                        hasMore = result.data.length === PAGE_SIZE
+                        page++
+                    } else {
+                        hasMore = false
+                    }
+                }
+                return allData
+            }
 
-            const data = currentResult.data
-            const previousData = previousResult.data
+            const [data, previousData] = await Promise.all([
+                fetchAllPages((page, size) => {
+                    let q = supabase.from('info_lead').select('created_at, agent_id, contador_interacoes, is_mql').order('created_at', { ascending: true }).gte('created_at', fromDate.toISOString()).lte('created_at', queryEndDate.toISOString()).range(page * size, (page + 1) * size - 1)
+                    if (agentFilter) q = q.in('agent_id', agentFilter)
+                    return q
+                }),
+                fetchAllPages((page, size) => {
+                    let q = supabase.from('info_lead').select('created_at, agent_id, contador_interacoes, is_mql').gte('created_at', previousFromDate.toISOString()).lte('created_at', previousToDate.toISOString()).range(page * size, (page + 1) * size - 1)
+                    if (agentFilter) q = q.in('agent_id', agentFilter)
+                    return q
+                })
+            ])
 
             let prevTotal = 0, prevConnected = 0, prevMql = 0
             previousData?.forEach((lead: any) => {
@@ -255,9 +339,9 @@ export function LeadsAreaChart() {
     }, [])
 
     return (
-        <div className="space-y-4 relative">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-xl font-bold text-foreground">Performance de Leads</h2>
+        <div className="flex flex-col h-full gap-3 relative">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
+                <h2 className="text-lg font-bold text-foreground">Performance de Leads</h2>
                 <div className="flex flex-wrap items-center gap-2">
                     <Popover>
                         <PopoverTrigger asChild>
@@ -274,7 +358,7 @@ export function LeadsAreaChart() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3 flex-shrink-0 overflow-hidden" style={{ maxHeight: '42%' }}>
                 <KpiCard title={!date?.from ? "Leads Totais da Semana" : "Leads Totais"} value={kpis.totalLeads} goal={0} currentValue={kpis.totalLeads} previousValue={previousKpis.totalLeads} goalLabel="Ponto" description={`Total de leads únicos recebidos no período.`} />
                 <KpiCard title={!date?.from ? "Leads Conectados da Semana" : "Leads Conectados"} value={kpis.connectedLeads} goal={calculateProportionalTarget(connectedLeadsTarget, date)} currentValue={kpis.connectedLeads} previousValue={previousKpis.connectedLeads} description={`Leads que tiveram mais de ${interactionThreshold} interações.`} secondaryMetric={{ label: "Conversão", value: `${kpis.avgConnectivity.toFixed(1)}%`, goal: connectivityTarget }} chart={
                     <ChartContainer config={{ conversion: { label: "Conversão", color: "#3b82f6" } }} className="h-full w-full">
@@ -302,9 +386,9 @@ export function LeadsAreaChart() {
                 } />
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                <Card className="xl:col-span-2 flex flex-col">
-                    <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 flex-1 min-h-0">
+                <Card className="xl:col-span-2 flex flex-col min-h-0">
+                    <CardHeader className="flex items-center gap-2 space-y-0 border-b py-3 sm:flex-row flex-shrink-0">
                         <div className="grid flex-1 gap-1 text-center sm:text-left">
                             <CardTitle className="text-lg font-semibold tracking-tight text-foreground/80 uppercase">Evolução Temporal</CardTitle>
                         </div>
@@ -316,8 +400,8 @@ export function LeadsAreaChart() {
                             ))}
                         </div>
                     </CardHeader>
-                    <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6 flex-1">
-                        <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
+                    <CardContent className="px-2 pt-2 sm:px-6 sm:pt-4 flex-1 min-h-0 flex flex-col">
+                        <ChartContainer config={chartConfig} className="aspect-auto flex-1 min-h-0 w-full">
                             <AreaChart data={chartData}>
                                 <defs>
                                     <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} /></linearGradient>
@@ -325,8 +409,8 @@ export function LeadsAreaChart() {
                                     {selectedAgents.map(a => <linearGradient key={a} id={`fill${a}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={chartConfig[a]?.color} stopOpacity={0.8} /><stop offset="95%" stopColor={chartConfig[a]?.color} stopOpacity={0.1} /></linearGradient>)}
                                 </defs>
                                 <CartesianGrid vertical={true} strokeDasharray="3 3" strokeOpacity={0.15} />
-                                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={12} minTickGap={32} tick={{ fontSize: 12, fill: '#888' }} />
-                                <YAxis tickLine={false} axisLine={false} tickMargin={8} width={40} tick={{ fontSize: 12, fill: '#888' }} />
+                                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} minTickGap={32} tick={{ fontSize: 10, fill: '#888' }} />
+                                <YAxis tickLine={false} axisLine={false} tickMargin={4} width={35} tick={{ fontSize: 10, fill: '#888' }} />
                                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                                 {metricType === 'comparison' ? (
                                     <>
@@ -337,7 +421,7 @@ export function LeadsAreaChart() {
                                 <ChartLegend content={<ChartLegendContent />} />
                             </AreaChart>
                         </ChartContainer>
-                        <div className="mt-auto pt-3 border-t border-primary/20">
+                        <div className="mt-auto pt-2 border-t border-primary/20 flex-shrink-0">
                             <p className="text-xs text-muted-foreground italic leading-relaxed text-center">
                                 {metricType === 'comparison' ? "Comparativo: Total vs Conectados" : `Comparando performance (${metricType === 'total' ? 'Total' : 'Conectados'})`}
                             </p>
@@ -345,8 +429,8 @@ export function LeadsAreaChart() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-card border-zinc-800 shadow-xl overflow-hidden flex flex-col xl:col-span-1">
-                    <CardHeader className="pb-4 pt-6 px-6 border-b">
+                <Card className="bg-card border-zinc-800 shadow-xl overflow-hidden flex flex-col xl:col-span-1 min-h-0">
+                    <CardHeader className="pb-3 pt-4 px-6 border-b flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Target className="h-4 w-4 text-primary" />
@@ -355,20 +439,50 @@ export function LeadsAreaChart() {
                             <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-black border border-primary/20">RENATA V2</span>
                         </div>
                     </CardHeader>
-                    <CardContent className="flex-1 pb-4 flex flex-col justify-center min-h-[300px]">
+                    <CardContent className="flex-1 pb-3 flex flex-col justify-between min-h-0">
                         {campaignLoading ? <div className="h-full flex items-center justify-center"><RefreshCw className="h-8 w-8 text-zinc-800 animate-spin" /></div> : campaignChartData.length === 0 ? <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">Nenhum dado encontrado.</div> : (
-                            <ChartContainer config={{ value: { label: "Cliques" }, ...Object.fromEntries(campaignChartData.map((d, i) => [d.name, { label: d.name, color: COLORS[i % COLORS.length] }])) }} className="mx-auto aspect-square w-full max-h-[250px]">
-                                <PieChart>
-                                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                                    <Pie data={campaignChartData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={60} paddingAngle={5}>
-                                        {campaignChartData.map((e, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                    </Pie>
-                                    <Legend verticalAlign="bottom" height={48} formatter={(v) => <span className="text-xs text-zinc-300 font-bold">{v}</span>} />
-                                </PieChart>
-                            </ChartContainer>
+                            <div className="flex-1 min-h-0 flex flex-col gap-1.5 py-2 overflow-y-auto custom-scrollbar">
+                                {/* Legenda */}
+                                <div className="flex items-center gap-3 mb-1 flex-shrink-0">
+                                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500" /><span className="text-[9px] text-muted-foreground">Contatos</span></div>
+                                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[9px] text-muted-foreground">Leads</span></div>
+                                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /><span className="text-[9px] text-muted-foreground">Conectados</span></div>
+                                </div>
+                                {campaignChartData.slice(0, 5).map((campaign) => {
+                                    const maxValue = campaignChartData[0]?.contacts || 1
+                                    return (
+                                        <div key={campaign.name} className="flex flex-col gap-0.5">
+                                            <span className="text-[10px] text-muted-foreground truncate" title={campaign.name}>{campaign.name}</span>
+                                            <div className="flex flex-col gap-[2px]">
+                                                {/* Barra 1: Contatos */}
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 h-[6px] bg-muted/30 rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${(campaign.contacts / maxValue) * 100}%` }} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-blue-400 w-[28px] text-right flex-shrink-0">{campaign.contacts}</span>
+                                                </div>
+                                                {/* Barra 2: Leads */}
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 h-[6px] bg-muted/30 rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${(campaign.leads / maxValue) * 100}%` }} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-emerald-400 w-[28px] text-right flex-shrink-0">{campaign.leads}</span>
+                                                </div>
+                                                {/* Barra 3: Conectados */}
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 h-[6px] bg-muted/30 rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${(campaign.connected / maxValue) * 100}%` }} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-amber-400 w-[28px] text-right flex-shrink-0">{campaign.connected}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         )}
-                        <div className="mt-auto pt-3 border-t border-primary/20">
-                            <p className="text-xs text-muted-foreground italic leading-relaxed text-center">Leads que enviaram o telefone na página de captura (Ponte).</p>
+                        <div className="pt-2 border-t border-primary/20 flex-shrink-0">
+                            <p className="text-xs text-muted-foreground italic leading-relaxed text-center">Funil por campanha — Contatos → Leads → Conectados.</p>
                         </div>
                     </CardContent>
                 </Card>

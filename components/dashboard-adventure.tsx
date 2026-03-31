@@ -12,12 +12,12 @@ export const DashboardAdventure = () => {
                 autoPlayInterval={30000}
             >
                 {/* Página 1 - O nosso dash */}
-                <ScrollPage index={0} className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                <ScrollPage index={0} className="p-5 md:p-8">
                     <LeadsAreaChart />
                 </ScrollPage>
 
                 {/* Página 2 - Análise de Conversas */}
-                <ScrollPage index={1} className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                <ScrollPage index={1} className="p-5 md:p-8">
                     <ConversationsAnalysis />
                 </ScrollPage>
             </ScrollAdventure>

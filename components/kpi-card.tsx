@@ -65,14 +65,13 @@ export function KpiCard({
     return (
         <Card className={cn(
             "flex flex-col h-full shadow-md border-muted",
-            chart ? "min-h-[420px]" : "min-h-[290px]"
         )}>
-            <CardContent className="p-6 flex-1 flex flex-col justify-between">
+            <CardContent className="p-5 flex-1 flex flex-col justify-between">
                 <div>
                     {/* Header: Title and Goal Box */}
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start mb-1">
                         <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold tracking-tight text-foreground/80 uppercase">{title}</h3>
+                            <h3 className="text-base font-semibold tracking-tight text-foreground/80 uppercase">{title}</h3>
                             {description && (
                                 <div title={description} className="cursor-help">
                                     <HelpCircle className="h-4 w-4 text-muted-foreground/50" />
@@ -83,16 +82,16 @@ export function KpiCard({
                         {/* Goal Box (Top Right) - Meta Principal */}
                         {goal !== undefined && (
                             <div className={cn(
-                                "flex flex-col items-end px-3 py-1.5 rounded-lg border bg-muted/30",
+                                "flex flex-col items-end px-2.5 py-1 rounded-lg border bg-muted/30",
                                 isGoalMet && !isPlaceholder ? "border-emerald-500/30 bg-emerald-500/5" : "border-muted"
                             )}>
                                 <span className={cn(
-                                    "text-lg font-black",
+                                    "text-base font-black",
                                     isGoalMet && !isPlaceholder ? "text-emerald-600" : "text-muted-foreground"
                                 )}>
                                     {isPlaceholder ? "..." : `${goalPercentage.toFixed(1)}%`}
                                 </span>
-                                <span className="text-[12px] text-muted-foreground uppercase font-bold">
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold">
                                     {goalLabel}: {isPlaceholder ? "..." : goal}
                                 </span>
                             </div>
@@ -100,8 +99,8 @@ export function KpiCard({
                     </div>
 
                     {/* Unified Value and Growth Area */}
-                    <div className="mt-2 flex items-baseline gap-4 whitespace-nowrap overflow-visible">
-                        <span className="text-7xl font-black tracking-tighter text-foreground leading-none">
+                    <div className="mt-1 flex items-baseline gap-3 whitespace-nowrap overflow-visible">
+                        <span className="text-6xl font-black tracking-tighter text-foreground leading-none">
                             {isPlaceholder ? "..." : value}
                         </span>
 
@@ -110,8 +109,8 @@ export function KpiCard({
                             isPlaceholder ? "text-muted-foreground" : growthColor
                         )}>
                             <div className="flex items-center">
-                                {isPlaceholder ? <MinusIcon className="h-5 w-5" /> : <GrowthIcon className="h-5 w-5" />}
-                                <span className="text-xl font-black ml-0.5">{isPlaceholder ? "..." : growthLabel}</span>
+                                {isPlaceholder ? <MinusIcon className="h-4 w-4" /> : <GrowthIcon className="h-4 w-4" />}
+                                <span className="text-lg font-black ml-0.5">{isPlaceholder ? "..." : growthLabel}</span>
                             </div>
                             <span className="text-sm text-muted-foreground font-semibold">
                                 vs. período anterior
@@ -122,20 +121,20 @@ export function KpiCard({
 
                 {/* Optional Detailed Chart */}
                 {chart && (
-                    <div className="flex-1 w-full min-h-[120px] max-h-[160px] my-4 overflow-hidden rounded-lg flex items-center justify-center">
+                    <div className="flex-1 w-full min-h-[90px] max-h-[140px] my-3 overflow-hidden rounded-lg flex items-center justify-center">
                         {chart}
                     </div>
                 )}
 
                 {/* Secondary Metric (Middle Section) */}
                 {secondaryMetric && (
-                    <div className="mt-6 py-3 border-t border-dashed border-muted-foreground/30">
-                        <p className="text-sm text-muted-foreground uppercase font-bold mb-1">
+                    <div className="mt-3 py-2 border-t border-dashed border-muted-foreground/30">
+                        <p className="text-xs text-muted-foreground uppercase font-bold mb-0.5">
                             {secondaryMetric.label}
                         </p>
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-black text-foreground/90">
+                                <span className="text-2xl font-black text-foreground/90">
                                     {isPlaceholder ? "..." : secondaryMetric.value}
                                 </span>
 
@@ -153,7 +152,7 @@ export function KpiCard({
                 )}
 
                 {/* Footer Description / Separator */}
-                <div className="mt-4 pt-3 border-t border-primary/20">
+                <div className="mt-auto pt-2 border-t border-primary/20">
                     <p className="text-xs text-muted-foreground italic leading-relaxed">
                         {description}
                     </p>
