@@ -169,7 +169,7 @@ export function LeadsAreaChart() {
             setCampaignLogs(enrichedLogs)
 
             // Cross-reference: buscar info_lead para os telefones das campanhas
-            const uniquePhones = [...new Set(enrichedLogs.map(l => l.phone).filter(Boolean))]
+            const uniquePhones = Array.from(new Set(enrichedLogs.map(l => l.phone).filter(Boolean)))
             const leadMap = new Map<string, { isLead: boolean, isConnected: boolean }>()
 
             if (uniquePhones.length > 0) {
